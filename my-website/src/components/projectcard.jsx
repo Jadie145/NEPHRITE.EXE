@@ -8,10 +8,15 @@ export default function ProjectCard({ title, image, link, mode = "arcade" }) {
     <>
       <div
         onClick={() => setOpen(true)}
-        className="relative pixel-border pixel-hover bg-neutral-800 p-4 cursor-pointer"
+        className="relative pixel-border pixel-hover p-4 cursor-pointer
+  bg-neutral-200 text-black
+  dark:bg-neutral-800 dark:text-white"
       >
         {/* Mode Badge */}
-        <div className="absolute top-3 right-3 pixel-border px-2 py-1 text-xs bg-black text-white">
+        <div className="absolute top-3 right-3
+    pixel-border px-2 py-1 text-xs
+    bg-neutral-200 text-black
+    dark:bg-neutral-900 dark:text-white">
           {mode === "arcade" && "🕹 ARCADE"}
           {mode === "interactive" && "📱 TOUCH"}
           {mode === "adaptive" && "🖥📱 ADAPTIVE"}
@@ -25,7 +30,7 @@ export default function ProjectCard({ title, image, link, mode = "arcade" }) {
 
         <h2 className="text-lg font-bold">{title}</h2>
 
-        <p className="text-xs opacity-60 mt-1">
+        <p className="text-xs mt-1 opacity-70 dark:opacity-60">
           ▶ CLICK TO PLAY
         </p>
 

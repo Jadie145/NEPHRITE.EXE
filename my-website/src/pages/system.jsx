@@ -1,38 +1,42 @@
-import ThemeToggle from "@/components/ThemeToggle";
+import { useSystemSettings } from "../hooks/useSystemSettings";
 
 export default function System() {
-  const isTouch = window.matchMedia("(pointer: coarse)").matches;
+  const { reset } = useSystemSettings();
 
   return (
-    <div className="max-w-3xl mx-auto mt-10 pixel-border bg-neutral-900 p-6">
-      <h1 className="text-xl mb-6">SYSTEM SETTINGS</h1>
+    <section className="mx-auto w-full max-w-2xl px-4 space-y-6">
+      <h1 className="text-xl text-center sm:text-left">
+        SYSTEM INFORMATION
+      </h1>
 
-      <div className="space-y-4 text-sm">
-        <div>
-          <span className="opacity-60">DEVICE:</span>{" "}
-          {isTouch ? "TOUCH / MOBILE" : "DESKTOP / KEYBOARD"}
-        </div>
-
-        <div>
-          <span className="opacity-60">THEME:</span>{" "}
-          <ThemeToggle />
-        </div>
-
-        <div>
-          <span className="opacity-60">CONTROLS:</span>
-          <ul className="ml-4 list-disc">
-            <li>ESC — Exit arcade</li>
-            <li>CLICK — Select project</li>
-            <li>ARROWS / WASD — Game input</li>
-          </ul>
-        </div>
-
-        <div className="opacity-50 mt-6">
-          JAYDE.EXE v1.0  
-          <br />
-          Built with React + Vite
-        </div>
+      {/* Build Info */}
+      <div className="pixel-border p-4 space-y-2">
+        <p>SOFTWARE:</p>
+        <ul className="text-sm opacity-80 space-y-1">
+          <li>• React 18</li>
+          <li>• Vite</li>
+          <li>• React Router</li>
+          <li>• Tailwind CSS</li>
+        </ul>
       </div>
-    </div>
+
+      {/* Build Metadata */}
+      <div className="pixel-border p-4 space-y-1 text-sm opacity-80">
+        <p>BUILD NAME: JAYDE.EXE</p>
+        <p>INTERFACE: Retro Pixel UI</p>
+        <p>MODE: Client-side SPA</p>
+        <p>BOOT STATE: Persistent (session)</p>
+      </div>
+
+      <hr className="opacity-30" />
+
+      {/* Reset */}
+      <button
+        onClick={reset}
+        className="pixel-border bg-red-600 text-white px-4 py-2 w-full sm:w-auto"
+      >
+        FACTORY RESET
+      </button>
+    </section>
   );
 }

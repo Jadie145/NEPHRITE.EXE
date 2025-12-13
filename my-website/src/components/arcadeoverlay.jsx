@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 export default function ArcadeOverlay({ src, mode = "arcade", onClose }) {
   const [booting, setBooting] = useState(true);
 
-  // Detect touch-based devices (phones, tablets, touch laptops)
+  // Detect touch devices
   const isMobile = window.matchMedia("(pointer: coarse)").matches;
 
-  // Resolve final mode
+  // Resolve mode
   const resolvedMode =
     mode === "adaptive"
       ? isMobile
@@ -14,9 +14,9 @@ export default function ArcadeOverlay({ src, mode = "arcade", onClose }) {
         : "arcade"
       : mode;
 
-  // Boot screen delay
+  // Boot delay
   useEffect(() => {
-    const timer = setTimeout(() => setBooting(false), 700);
+    const timer = setTimeout(() => setBooting(false), 1500);
     return () => clearTimeout(timer);
   }, []);
 
@@ -28,10 +28,10 @@ export default function ArcadeOverlay({ src, mode = "arcade", onClose }) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
-      {/* Header */}
-      <div className="flex justify-between items-center p-3 pixel-border bg-neutral-900">
-        <span className="text-white">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* HEADER */}
+      <div className="flex justify-between items-center p-3 pixel-border bg-neutral-900 text-white">
+        <span>
           {resolvedMode === "arcade"
             ? "ARCADE MODE"
             : resolvedMode === "interactive"
@@ -47,34 +47,35 @@ export default function ArcadeOverlay({ src, mode = "arcade", onClose }) {
         </button>
       </div>
 
-      {/* Content */}
-      {booting ? (
-        /* BOOT SCREEN */
-        <div className="flex-1 flex flex-col items-center justify-center bg-black text-white pixel-font">
-          <p className="mb-4">INSERT COIN</p>
-          <p className="animate-pulse">● ● ●</p>
-        </div>
-      ) : resolvedMode === "arcade" ? (
-        /* ARCADE MODE */
-        <div className="flex-1 flex items-center justify-center bg-black overflow-hidden">
-          <div className="crt pixel-border arcade-screen">
+      {/* BODY */}
+      <div className="flex-1 flex items-center justify-center overflow-hidden">
+        {booting ? (
+          /* BOOT SCREEN */
+          <div className="pixel-border p-6 text-center bg-black text-white">
+            <p className="mb-2">BOOTING SYSTEM...</p>
+            <p className="opacity-60 text-xs">LOADING MODULES</p>
+            <div className="mt-4 h-2 w-40 bg-neutral-800">
+              <div className="h-full w-full animate-pulse bg-white" />
+            </div>
+          </div>
+        ) : resolvedMode === "arcade" ? (
+          /* ARCADE MODE */
+          <div className="arcade-shell crt">
             <iframe
               src={src}
               className="arcade-iframe"
               title="Arcade"
             />
           </div>
-        </div>
-      ) : (
-        /* INTERACTIVE MODE */
-        <div className="flex-1 bg-black">
+        ) : (
+          /* INTERACTIVE MODE */
           <iframe
             src={src}
             className="w-full h-full border-none"
             title="Interactive"
           />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
