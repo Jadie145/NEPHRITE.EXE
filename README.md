@@ -1,4 +1,4 @@
-# 🟢 NEPHRITE.EXE // SYSTEM_MANUAL_v1.0
+# <img src="public/logo.png" alt="Nephrite Logo" width="45" height="45" /> NEPHRITE.EXE // SYSTEM_MANUAL_v1.0
 
 ![React](https://img.shields.io/badge/CORE-REACT_18-blue?style=for-the-badge)
 ![Tailwind](https://img.shields.io/badge/STYLE-TAILWIND_CSS-cyan?style=for-the-badge)
