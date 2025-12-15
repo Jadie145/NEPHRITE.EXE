@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom"; // <--- REMOVED "BrowserRouter as Router"
 
 import Navbar from "./components/navbar";
-import Footer from "./components/footer"; // Ensure this is imported
+import Footer from "./components/footer"; 
 import BootScreen from "./components/bootscreen";
 import { useSystemSettings } from "./hooks/usesystemsettings";
 
@@ -43,49 +43,41 @@ export default function App() {
   if (!booted) return <BootScreen onFinish={finishBoot} />;
 
   return (
-    <Router>
-      <div className="min-h-screen w-full text-foreground selection:bg-green-500/30 selection:text-green-200">
-        
-        {/* === LAYER 1: FIXED BACKGROUND WALLPAPER === */}
-        {/* This div sits permanently in the back and never scrolls */}
-        <div 
-            className={`fixed inset-0 z-0 pointer-events-none ${
-                settings.background ? "retro-bg" : "bg-neutral-900"
-            }`}
-        ></div>
+    // <--- REMOVED <Router> wrapper here
+    <div className="min-h-screen w-full text-foreground selection:bg-green-500/30 selection:text-green-200">
+      
+      {/* === LAYER 1: FIXED BACKGROUND WALLPAPER === */}
+      <div 
+          className={`fixed inset-0 z-0 pointer-events-none ${
+              settings.background ? "retro-bg" : "bg-neutral-900"
+          }`}
+      ></div>
 
-        {/* === LAYER 2: APP CONTENT === */}
-        {/* This is what scrolls. Navbar and Footer sit inside here but use 'fixed' to stay on screen */}
-        <div className="relative z-10">
-            
-            <Navbar />
+      {/* === LAYER 2: APP CONTENT === */}
+      <div className="relative z-10">
+          
+          <Navbar />
 
-            {/* Main Content:
-                - pt-24: Pushes content down below Navbar
-                - pb-24: Pushes content up above Footer
-                - min-h-screen: Ensures footer is always at bottom even on empty pages
-            */}
-            <main className="pt-24 pb-24 px-4 max-w-7xl mx-auto min-h-screen flex flex-col">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/projects" element={<Projects />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/sys" element={<System />} />
-              </Routes>
-            </main>
+          <main className="pt-24 pb-24 px-4 max-w-7xl mx-auto min-h-screen flex flex-col">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/sys" element={<System />} />
+            </Routes>
+          </main>
 
-            <Footer />
-        </div>
-
-        {/* === LAYER 3: GLOBAL OVERLAYS === */}
-        {/* Debug or CRT effects that sit on top of EVERYTHING */}
-        {settings.debug && <div className="debug-overlay fixed inset-0 z-[100] pointer-events-none"></div>}
-        
-        {settings.crt && (
-            <div className="pointer-events-none fixed inset-0 z-[60] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] opacity-20"></div>
-        )}
-        
+          <Footer />
       </div>
-    </Router>
+
+      {/* === LAYER 3: GLOBAL OVERLAYS === */}
+      {settings.debug && <div className="debug-overlay fixed inset-0 z-[100] pointer-events-none"></div>}
+      
+      {settings.crt && (
+          <div className="pointer-events-none fixed inset-0 z-[60] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] opacity-20"></div>
+      )}
+      
+    </div>
+    // <--- REMOVED </Router> wrapper here
   );
 }

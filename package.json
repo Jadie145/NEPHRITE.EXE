@@ -1,6 +1,6 @@
 {
-  "name": "my-website",
-  "homepage": "https://jadie145.github.io/NEPHRITE-EXE",
+  "name": "nephrite-exe", 
+  "homepage": "https://jadie145.github.io/NEPHRITE-EXE/", 
   "version": "0.0.0",
   "type": "module",
   "scripts": {
