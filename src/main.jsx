@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { HashRouter } from 'react-router-dom' // <--- 1. Import this
 import './index.css'
 import App from './App.jsx'
 
@@ -15,6 +16,8 @@ if (localStorage.getItem("scanlines") !== "false") {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <HashRouter> {/* <--- 2. Wrap your App component here */}
+      <App />
+    </HashRouter>
   </StrictMode>,
 )
