@@ -1,21 +1,24 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom"; // You need this for navigation
-import projects from "../data/projects.json";
-import ProjectCard from "@/components/ProjectCard";
+import { Link } from "react-router-dom"; 
+import projects from "../projects/projects.json"; // <--- Updated path to match Projects.jsx
+import ProjectCard from "../components/projectcard"; // <--- Updated path/case to match Projects.jsx
 
 export default function Home() {
   const [visits, setVisits] = useState(0);
   const [time, setTime] = useState(new Date().toLocaleTimeString());
 
+  // 1. Get the Correct Base URL (Vital for GitHub Pages images)
+  const baseUrl = import.meta.env.BASE_URL;
+
   // Handle Visits & Clock
   useEffect(() => {
-    // 1. Visit Counter
+    // Visit Counter
     const key = "jayde_exe_visits";
     const current = Number(localStorage.getItem(key) || 0) + 1;
     localStorage.setItem(key, current);
     setVisits(current);
 
-    // 2. Real-time Clock
+    // Real-time Clock
     const timer = setInterval(() => {
       setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     }, 1000);
@@ -73,9 +76,17 @@ export default function Home() {
 
         {/* Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {projects.slice(0, 2).map((p) => (
-            <ProjectCard key={p.title} {...p} />
-          ))}
+          {projects.slice(0, 2).map((p) => {
+            // 2. Fix the Image & Link paths using Base URL
+            // This prevents broken images on the Home page
+            const fixedProject = {
+                ...p,
+                image: `${baseUrl}${p.image.replace(/^\//, '')}`,
+                link: `${baseUrl}${p.link.replace(/^\//, '')}`
+            };
+            
+            return <ProjectCard key={p.title} {...fixedProject} />;
+          })}
         </div>
 
         {/* View All Link */}
