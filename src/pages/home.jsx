@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom"; 
-import projects from "../projects/projects.json"; // <--- Updated path to match Projects.jsx
-import ProjectCard from "../components/projectcard"; // <--- Updated path/case to match Projects.jsx
+import projects from "../projects/projects.json"; 
+import ProjectCard from "../components/projectcard"; 
 
 export default function Home() {
   const [visits, setVisits] = useState(0);
   const [time, setTime] = useState(new Date().toLocaleTimeString());
 
-  // 1. Get the Correct Base URL (Vital for GitHub Pages images)
+  // 1. Get the Correct Base URL
   const baseUrl = import.meta.env.BASE_URL;
 
   // Handle Visits & Clock
@@ -39,8 +39,8 @@ export default function Home() {
             </span>
         </div>
 
-        {/* Main Title with Cursor */}
-        <h1 className="font-arcade text-4xl md:text-6xl tracking-tight">
+        {/* Main Title with Cursor - RESPONSIVE FIX: Smaller text on mobile */}
+        <h1 className="font-arcade text-3xl sm:text-4xl md:text-6xl tracking-tight break-words">
           <span className="text-green-600 dark:text-green-400 mr-2">▶</span>
           NEPHRITE.EXE
           <span className="animate-pulse text-green-500">_</span>
@@ -55,11 +55,19 @@ export default function Home() {
             SESSION_ID: <span className="text-green-600 dark:text-green-400">#{visits.toString().padStart(6, '0')}</span>
         </div>
 
-        {/* Primary Call to Action Button */}
+        {/* Primary Call to Action Button - RESPONSIVE FIX: Smaller text & padding on mobile */}
         <div className="pt-6">
             <Link 
                 to="/projects" 
-                className="inline-block font-arcade text-sm bg-foreground text-background px-6 py-4 hover:scale-105 active:scale-95 transition-transform border-2 border-transparent hover:border-green-500"
+                className="
+                    inline-block font-arcade 
+                    text-[10px] sm:text-xs md:text-sm 
+                    bg-foreground text-background 
+                    px-4 py-3 md:px-6 md:py-4 
+                    hover:scale-105 active:scale-95 transition-transform 
+                    border-2 border-transparent hover:border-green-500
+                    whitespace-nowrap max-w-full truncate
+                "
             >
                 [ INSERT COIN / START ]
             </Link>
@@ -77,8 +85,7 @@ export default function Home() {
         {/* Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {projects.slice(0, 2).map((p) => {
-            // 2. Fix the Image & Link paths using Base URL
-            // This prevents broken images on the Home page
+            // Fix the Image & Link paths using Base URL
             const fixedProject = {
                 ...p,
                 image: `${baseUrl}${p.image.replace(/^\//, '')}`,

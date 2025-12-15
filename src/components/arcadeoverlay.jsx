@@ -1,4 +1,4 @@
-import { useEffect, useState} from "react";
+import { useEffect, useState } from "react";
 
 export default function ArcadeOverlay({ src, mode = "arcade", onClose }) {
   const [isIframeLoaded, setIframeLoaded] = useState(false);
@@ -49,20 +49,23 @@ export default function ArcadeOverlay({ src, mode = "arcade", onClose }) {
     }
   };
 
-  // Resolve Logic: If mobile, force interactive; otherwise respect prop
-  const activeMode = mode === "adaptive" && isMobile ? "interactive" : mode;
+  // === KEY FIX ===
+  // If on Mobile, force "interactive" mode. 
+  // This ignores the 16:9 arcade ratio and fills the phone screen.
+  const activeMode = isMobile ? "interactive" : mode;
+  
   const isLoading = !isIframeLoaded || !minLoadTimePassed;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col font-mono animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col font-mono animate-in fade-in duration-300">
       
       {/* --- HUD HEADER --- */}
-      <div className="flex justify-between items-center p-2 border-b-2 border-neutral-800 bg-neutral-900 text-xs sm:text-sm select-none">
+      <div className="flex justify-between items-center p-2 border-b-2 border-neutral-800 bg-neutral-900 text-xs sm:text-sm select-none z-50 relative">
         
         {/* Left: System Status */}
         <div className="flex items-center gap-4 text-green-500">
           <span className="font-bold tracking-widest hidden sm:inline">
-             SYS::OVERLAY
+              SYS::OVERLAY
           </span>
           <span className="flex items-center gap-2 px-2 py-0.5 bg-neutral-800 rounded border border-neutral-700 text-gray-300">
             <div className={`w-2 h-2 rounded-full ${isLoading ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
@@ -73,11 +76,11 @@ export default function ArcadeOverlay({ src, mode = "arcade", onClose }) {
         {/* Right: Controls */}
         <div className="flex items-center gap-2">
           
-          {/* CRT Toggle (Only show in Arcade Desktop mode) */}
+          {/* CRT Toggle (Show in Arcade OR if user wants retro feel on mobile) */}
           {activeMode === "arcade" && (
             <button 
               onClick={() => setCrtEnabled(!crtEnabled)}
-              className={`px-2 py-1 border ${crtEnabled ? 'border-green-600 text-green-400 bg-green-900/20' : 'border-neutral-600 text-neutral-500'} hover:bg-neutral-800 transition-colors`}
+              className={`hidden sm:block px-2 py-1 border ${crtEnabled ? 'border-green-600 text-green-400 bg-green-900/20' : 'border-neutral-600 text-neutral-500'} hover:bg-neutral-800 transition-colors`}
               title="Toggle CRT Effect"
             >
               CRT:{crtEnabled ? "ON" : "OFF"}
@@ -120,33 +123,34 @@ export default function ArcadeOverlay({ src, mode = "arcade", onClose }) {
         <div className={`relative transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'} w-full h-full flex items-center justify-center`}>
             
             {activeMode === "arcade" ? (
-              /* ARCADE CONTAINER */
+              /* DESKTOP ARCADE CONTAINER (16:9 FIXED) */
               <div className={`relative transition-all duration-500 ${crtEnabled ? 'arcade-shell crt' : 'arcade-shell-clean'}`}>
-                 {/* The iframe needs onLoad to trigger the state change */}
                  <iframe
-                    src={src}
-                    onLoad={() => setIframeLoaded(true)}
-                    className="arcade-iframe block w-full h-full bg-black"
-                    title="Arcade Project"
-                  />
-                  {/* Reflection Glare (Visual Polish) */}
-                  {crtEnabled && <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent z-10 rounded-lg"></div>}
+                   src={src}
+                   onLoad={() => setIframeLoaded(true)}
+                   className="arcade-iframe block w-full h-full bg-black"
+                   title="Arcade Project"
+                 />
+                 {crtEnabled && <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent z-10 rounded-lg"></div>}
               </div>
             ) : (
-              /* INTERACTIVE/MOBILE CONTAINER */
-              <iframe
-                src={src}
-                onLoad={() => setIframeLoaded(true)}
-                className="w-full h-full border-none bg-white"
-                title="Interactive Project"
-              />
+              /* MOBILE / INTERACTIVE CONTAINER (FULL SCREEN) */
+              /* z-10 ensures it sits above the grid background */
+              <div className="w-full h-full relative z-10">
+                  <iframe
+                    src={src}
+                    onLoad={() => setIframeLoaded(true)}
+                    className="w-full h-full border-none bg-white"
+                    title="Interactive Project"
+                  />
+              </div>
             )}
         </div>
       </div>
       
       {/* --- FOOTER INSTRUCTIONS (Only Desktop) --- */}
       {!isMobile && (
-        <div className="py-1 bg-neutral-900 text-center text-[10px] text-neutral-500 uppercase tracking-widest border-t border-neutral-800">
+        <div className="py-1 bg-neutral-900 text-center text-[10px] text-neutral-500 uppercase tracking-widest border-t border-neutral-800 z-50 relative">
            Controls: Mouse / Arrow Keys • Press ESC to Exit
         </div>
       )}
