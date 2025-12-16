@@ -1,5 +1,6 @@
 # <img src="public/logo.png" alt="Nephrite Logo" width="45" height="45" /> NEPHRITE.EXE // SYSTEM_MANUAL_v1.0
 
+[![Live Demo](https://img.shields.io/badge/DEPLOYMENT-LIVE_SYSTEM-2ea44f?style=for-the-badge&logo=github)](https://jadie145.github.io/NEPHRITE-EXE/)
 ![React](https://img.shields.io/badge/CORE-REACT_18-blue?style=for-the-badge)
 ![Tailwind](https://img.shields.io/badge/STYLE-TAILWIND_CSS-cyan?style=for-the-badge)
 ![Status](https://img.shields.io/badge/SYSTEM-ONLINE-success?style=for-the-badge)
@@ -7,6 +8,8 @@
 > **"Turning caffeine into code since 2025."**
 
 **NEPHRITE.EXE** is a high-fidelity, retro-futuristic personal operating system designed to showcase projects, skills, and experiments. It combines nostalgic **CRT aesthetics** with modern **React performance**, featuring a fully interactive interface, simulated hardware limitations, and a 3D parallax environment.
+
+### 🟢 [ACCESS TERMINAL HERE (Live Demo)](https://jadie145.github.io/NEPHRITE-EXE/)
 
 ---
 
