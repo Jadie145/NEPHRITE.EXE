@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHESTRIS: Checkmate the Stack</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        :root {
+            --bg-color: #1a1a2e;
+            --grid-color: #16213e;
+            --accent-color: #0f3460;
+            --text-color: #e94560;
+            --highlight: #ffd700;
+        }
+
+        body {
+            background-color: #050505;
+            color: white;
+            font-family: 'Press Start 2P', cursive;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            border: 4px solid #444;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            background-color: var(--bg-color);
+        }
+
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        #phase-indicator {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            font-size: 16px;
+            color: #00ffcc;
+            width: 300px;
+            background: rgba(0,0,0,0.5);
+            padding: 5px;
+            animation: pulse 1s infinite;
+        }
+
+        #modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid white;
+            padding: 20px;
+            text-align: center;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 10;
+            width: 85%;
+            max-width: 450px;
+        }
+
+        .hidden { display: none !important; }
+
+        .btn-primary {
+            background: #e94560;
+            border: 2px solid white;
+            color: white;
+            padding: 15px 20px;
+            font-family: 'Press Start 2P', cursive;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+        }
+
+        .btn-primary:hover { background: #ff6b81; }
+
+        /* Character Select Styles */
+        #char-select-container {
+            margin: 10px 0;
+        }
+        
+        .char-label {
+            font-size: 10px;
+            color: #ccc;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .char-grid {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .char-btn {
+            background: #222;
+            border: 2px solid #444;
+            color: #888;
+            font-size: 24px;
+            width: 45px;
+            height: 45px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .char-btn:hover {
+            border-color: #666;
+            background: #333;
+        }
+
+        .char-btn.selected {
+            border-color: #ffd700;
+            color: #fff;
+            background: #0f3460;
+            box-shadow: 0 0 10px #ffd700;
+        }
+
+        /* CRT Scanline Effect */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.1) 50%,
+                rgba(0,0,0,0.1)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; text-shadow: 0 0 10px #00ffcc; }
+            100% { opacity: 0.7; }
+        }
+
+        #controls-hint {
+            margin-top: 10px;
+            font-size: 10px;
+            color: #888;
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .key { color: #ffd700; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui-layer">
+            <div id="phase-indicator">TETRIS PHASE</div>
+        </div>
+
+        <div id="modal">
+            <h1 id="modal-title" style="color:#ffd700; font-size: 24px; margin:0; line-height: 1.5;">CHESTRIS</h1>
+            
+            <div id="char-select-container">
+                <span class="char-label">SELECT YOUR HERO:</span>
+                <div class="char-grid">
+                    <button class="char-btn selected" onclick="selectChar('king')" title="King">♔</button>
+                    <button class="char-btn" onclick="selectChar('queen')" title="Queen">♕</button>
+                    <button class="char-btn" onclick="selectChar('rook')" title="Rook">♖</button>
+                    <button class="char-btn" onclick="selectChar('bishop')" title="Bishop">♗</button>
+                    <button class="char-btn" onclick="selectChar('knight')" title="Knight">♘</button>
+                </div>
+            </div>
+
+            <p id="modal-desc" style="font-size: 12px; line-height: 1.8;">
+                ESCAPE THE PIT!<br>
+                1. DROP blocks to build paths.<br>
+                2. SQUASH enemies with blocks.<br>
+                3. MOVE your piece to the TOP.<br>
+            </p>
+            <button class="btn-primary" onclick="startGame()">START GAME</button>
+        </div>
+    </div>
+
+    <div id="controls-hint">
+        <p>PHASE 1: <span class="key">ARROWS</span> Move/Rotate | <span class="key">SPACE</span> Drop</p>
+        <p>PHASE 2: <span class="key">CLICK</span> Green Tiles to Move Piece</p>
+    </div>
+
+    <div class="scanlines"></div>
+
+<script>
+/**
+ * CHESTRIS GAME LOGIC - V7
+ * Feature: Insta-Drop (Spacebar)
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// CONSTANTS
+const COLS = 10;
+const ROWS = 20;
+const BLOCK_SIZE = 30;
+const SIDEBAR_WIDTH = 160;
+const BOARD_WIDTH = COLS * BLOCK_SIZE;
+const BOARD_HEIGHT = ROWS * BLOCK_SIZE;
+
+canvas.width = BOARD_WIDTH + SIDEBAR_WIDTH;
+canvas.height = BOARD_HEIGHT;
+
+// ASSETS & COLORS
+const COLORS = [
+    null,
+    '#FF0D72', // T - Purple/Pink
+    '#0DC2FF', // I - Cyan
+    '#0DFF72', // S - Green
+    '#F538FF', // Z - Magenta
+    '#FF8E0D', // L - Orange
+    '#FFE138', // O - Yellow
+    '#3877FF', // J - Blue
+];
+
+const CHESS_SYMBOLS = {
+    king: '♔',
+    queen: '♕',
+    rook: '♖',
+    bishop: '♗',
+    knight: '♘',
+    pawn: '♙'
+};
+
+// GAME STATE
+let grid = []; 
+let chessPieces = []; 
+let playerPiece = null;
+let activeTetromino = null;
+let nextTetrominoType = null;
+let nextEnemyType = null;
+let selectedPlayerType = 'king'; // Default
+
+let score = 0;
+let phase = 'START'; 
+let dropCounter = 0;
+let dropInterval = 1000;
+let lastTime = 0;
+let validMoves = []; 
+
+// --- CLASSES ---
+
+class Piece {
+    constructor(x, y, type, team) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.team = team;
+        this.alive = true;
+    }
+
+    draw(ctx) {
+        if (!this.alive) return;
+        
+        ctx.save();
+        ctx.font = `${BLOCK_SIZE - 2}px "Press Start 2P"`; 
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        const px = (this.x * BLOCK_SIZE) + (BLOCK_SIZE/2);
+        const py = (this.y * BLOCK_SIZE) + (BLOCK_SIZE/2) + 2;
+
+        if (this.team === 'player') {
+            ctx.fillStyle = '#FFFFFF'; 
+            ctx.shadowColor = '#00FFFF';
+            ctx.shadowBlur = 10;
+            ctx.fillText(CHESS_SYMBOLS[this.type], px, py);
+            
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 0;
+            ctx.strokeRect(this.x * BLOCK_SIZE + 2, this.y * BLOCK_SIZE + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+        } else {
+            ctx.fillStyle = '#000000'; 
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.strokeText(CHESS_SYMBOLS[this.type], px, py);
+            ctx.fillText(CHESS_SYMBOLS[this.type], px, py);
+        }
+        
+        ctx.restore();
+    }
+
+    getValidMoves(grid, pieces) {
+        let moves = [];
+        const isSliding = ['rook', 'bishop', 'queen'].includes(this.type);
+
+        const directions = {
+            'king': [[0,1], [0,-1], [1,0], [-1,0], [1,1], [1,-1], [-1,1], [-1,-1]],
+            'queen': [[0,1], [0,-1], [1,0], [-1,0], [1,1], [1,-1], [-1,1], [-1,-1]],
+            'knight': [[1,2], [1,-2], [-1,2], [-1,-2], [2,1], [2,-1], [-2,1], [-2,-1]],
+            'pawn': [[0,1], [0,-1], [1,0], [-1,0]],
+            'rook': [[0,1], [0,-1], [1,0], [-1,0]], 
+            'bishop': [[1,1], [1,-1], [-1,1], [-1,-1]]
+        };
+
+        const dirs = directions[this.type] || directions['king']; 
+        
+        if (isSliding) {
+            // SLIDING LOGIC
+            for (let d of dirs) {
+                let dist = 1;
+                while (true) {
+                    let nx = this.x + (d[0] * dist);
+                    let ny = this.y + (d[1] * dist);
+                    
+                    if (!isValidPos(nx, ny)) break;
+                    
+                    // Must move ONTO a block (grid !== 0)
+                    if (grid[ny][nx] === 0) break;
+
+                    const occ = pieces.find(p => p.x === nx && p.y === ny && p.alive);
+                    if (occ) {
+                        if (occ.team !== this.team) {
+                            moves.push({x: nx, y: ny}); 
+                        }
+                        break; 
+                    }
+
+                    moves.push({x: nx, y: ny});
+                    dist++;
+                }
+            }
+        } else {
+            // STEPPING LOGIC
+            for (let d of dirs) {
+                let nx = this.x + d[0];
+                let ny = this.y + d[1];
+                
+                if (isValidPos(nx, ny) && grid[ny][nx] !== 0) {
+                    const occ = pieces.find(p => p.x === nx && p.y === ny && p.alive);
+                    if (!occ || occ.team !== this.team) {
+                        moves.push({x: nx, y: ny});
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+}
+
+class Tetromino {
+    constructor(typeIdx) {
+        this.typeIdx = typeIdx !== undefined ? typeIdx : Math.floor(Math.random() * 7);
+        this.matrix = createPieceMatrix(this.typeIdx);
+        this.pos = {x: Math.floor(COLS / 2) - 1, y: 0};
+        this.colorIndex = this.typeIdx + 1; 
+    }
+}
+
+// --- HELPERS ---
+
+function createPieceMatrix(typeIdx) {
+    const pieces = 'ILJOTSZ';
+    const type = pieces[typeIdx];
+    if (type === 'I') return [[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]];
+    if (type === 'L') return [[0,2,0],[0,2,0],[0,2,2]];
+    if (type === 'J') return [[0,3,0],[0,3,0],[3,3,0]];
+    if (type === 'O') return [[4,4],[4,4]];
+    if (type === 'Z') return [[5,5,0],[0,5,5],[0,0,0]];
+    if (type === 'S') return [[0,6,6],[6,6,0],[0,0,0]];
+    if (type === 'T') return [[0,7,0],[7,7,7],[0,0,0]];
+}
+
+function createGrid(w, h) {
+    const matrix = [];
+    while (h--) matrix.push(new Array(w).fill(0));
+    return matrix;
+}
+
+function drawMatrix(matrix, offset, colorIndex, ctxRef = ctx) {
+    matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                const drawX = (x + offset.x) * BLOCK_SIZE;
+                const drawY = (y + offset.y) * BLOCK_SIZE;
+                
+                ctxRef.fillStyle = COLORS[colorIndex || value];
+                ctxRef.fillRect(drawX, drawY, BLOCK_SIZE, BLOCK_SIZE);
+                
+                ctxRef.lineWidth = 2;
+                ctxRef.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctxRef.strokeRect(drawX, drawY, BLOCK_SIZE, BLOCK_SIZE);
+                
+                ctxRef.fillStyle = 'rgba(0,0,0,0.2)';
+                ctxRef.fillRect(drawX + 5, drawY + 5, BLOCK_SIZE - 10, BLOCK_SIZE - 10);
+            }
+        });
+    });
+}
+
+function isValidPos(x, y) {
+    return x >= 0 && x < COLS && y >= 0 && y < ROWS;
+}
+
+function collide(arena, player) {
+    const m = player.matrix;
+    const o = player.pos;
+    for (let y = 0; y < m.length; ++y) {
+        for (let x = 0; x < m[y].length; ++x) {
+            if (m[y][x] !== 0 &&
+               (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function merge(arena, player) {
+    player.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                arena[y + player.pos.y][x + player.pos.x] = player.colorIndex;
+            }
+        });
+    });
+}
+
+function rotate(matrix, dir) {
+    for (let y = 0; y < matrix.length; ++y) {
+        for (let x = 0; x < y; ++x) {
+            [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+        }
+    }
+    if (dir > 0) matrix.forEach(row => row.reverse());
+    else matrix.reverse();
+}
+
+// --- GAMEPLAY ---
+
+function selectChar(type) {
+    selectedPlayerType = type;
+    const map = {
+        'king': 0, 'queen': 1, 'rook': 2, 'bishop': 3, 'knight': 4
+    };
+    const btns = document.querySelectorAll('.char-btn');
+    document.querySelectorAll('.char-btn').forEach(b => b.classList.remove('selected'));
+    if(btns[map[type]]) btns[map[type]].classList.add('selected');
+}
+
+function init() {
+    grid = createGrid(COLS, ROWS);
+    chessPieces = [];
+    score = 0;
+    dropInterval = 800; 
+    playerPiece = null;
+    
+    nextTetrominoType = Math.floor(Math.random() * 7);
+    nextEnemyType = ['pawn', 'pawn', 'knight'][Math.floor(Math.random()*3)];
+    
+    spawnTetromino();
+    phase = 'TETRIS';
+    updateUI();
+}
+
+function startGame() {
+    document.getElementById('modal').classList.add('hidden');
+    init();
+    update();
+}
+
+function spawnTetromino() {
+    activeTetromino = new Tetromino(nextTetrominoType);
+    nextTetrominoType = Math.floor(Math.random() * 7);
+    nextEnemyType = ['pawn', 'pawn', 'knight'][Math.floor(Math.random()*3)];
+    if(score > 1000) nextEnemyType = 'rook'; 
+
+    if (collide(grid, activeTetromino)) {
+        endGame("STACK OVERFLOW");
+    }
+}
+
+function playerHardDrop() {
+    while (!collide(grid, activeTetromino)) {
+        activeTetromino.pos.y++;
+    }
+    activeTetromino.pos.y--;
+    lockTetromino();
+    dropCounter = 0;
+}
+
+function playerDrop() {
+    activeTetromino.pos.y++;
+    if (collide(grid, activeTetromino)) {
+        activeTetromino.pos.y--;
+        lockTetromino();
+    }
+    dropCounter = 0;
+}
+
+function playerMove(offset) {
+    activeTetromino.pos.x += offset;
+    if (collide(grid, activeTetromino)) {
+        activeTetromino.pos.x -= offset;
+    }
+}
+
+function playerRotate(dir) {
+    const pos = activeTetromino.pos.x;
+    let offset = 1;
+    rotate(activeTetromino.matrix, dir);
+    while (collide(grid, activeTetromino)) {
+        activeTetromino.pos.x += offset;
+        offset = -(offset + (offset > 0 ? 1 : -1));
+        if (offset > activeTetromino.matrix[0].length) {
+            rotate(activeTetromino.matrix, -dir);
+            activeTetromino.pos.x = pos;
+            return;
+        }
+    }
+}
+
+function lockTetromino() {
+    // Check squashing
+    let crushedSomething = false;
+    activeTetromino.matrix.forEach((row, y) => {
+        row.forEach((val, x) => {
+            if (val !== 0) {
+                const landingX = activeTetromino.pos.x + x;
+                const landingY = activeTetromino.pos.y + y;
+                
+                const victim = chessPieces.find(p => p.x === landingX && p.y === landingY && p.alive);
+                if (victim) {
+                    victim.alive = false;
+                    createExplosion(landingX, landingY, '#FFF');
+                    if (victim.team === 'player') {
+                        crushedSomething = true;
+                        setTimeout(() => endGame("CRUSHED BY BLOCK!"), 100);
+                    } else {
+                        score += 100;
+                    }
+                }
+            }
+        });
+    });
+
+    if(crushedSomething) {
+        merge(grid, activeTetromino);
+        return; 
+    }
+
+    merge(grid, activeTetromino);
+    
+    const placedBlocks = [];
+    activeTetromino.matrix.forEach((row, y) => {
+        row.forEach((val, x) => {
+            if(val !== 0) {
+                placedBlocks.push({x: activeTetromino.pos.x + x, y: activeTetromino.pos.y + y});
+            }
+        });
+    });
+
+    // Spawn Logic
+    if (!playerPiece) {
+        placedBlocks.sort((a,b) => b.y - a.y); 
+        let spawn = placedBlocks[0];
+        playerPiece = new Piece(spawn.x, spawn.y, selectedPlayerType, 'player');
+        chessPieces.push(playerPiece);
+    } else {
+        if (placedBlocks.length > 0) {
+            let spawn = placedBlocks[Math.floor(Math.random() * placedBlocks.length)];
+            if(spawn.x !== playerPiece.x || spawn.y !== playerPiece.y) {
+                const existing = chessPieces.find(p => p.x === spawn.x && p.y === spawn.y && p.alive);
+                if (!existing) {
+                    chessPieces.push(new Piece(spawn.x, spawn.y, nextEnemyType, 'enemy'));
+                }
+            }
+        }
+    }
+
+    sweepArena();
+
+    if (playerPiece && playerPiece.alive && playerPiece.y <= 1) {
+        endGame("ESCAPED THE PIT! VICTORY!");
+        return;
+    }
+
+    if (playerPiece && playerPiece.alive) {
+        startPlayerPhase();
+    } else if (playerPiece && !playerPiece.alive) {
+        // Already ended
+    } else {
+        spawnTetromino();
+    }
+}
+
+function sweepArena() {
+    let rowCount = 1;
+    outer: for (let y = ROWS - 1; y > 0; --y) {
+        for (let x = 0; x < COLS; ++x) {
+            if (grid[y][x] === 0) {
+                continue outer;
+            }
+        }
+        
+        const row = grid.splice(y, 1)[0].fill(0);
+        grid.unshift(row);
+        ++y;
+        score += rowCount * 100;
+        rowCount *= 2;
+    }
+    applyPieceGravity();
+}
+
+function applyPieceGravity() {
+    let stable = false;
+    let iterations = 0;
+    while (!stable && iterations < 20) {
+        stable = true;
+        iterations++;
+        chessPieces.forEach(p => {
+            if (!p.alive) return;
+            
+            // GRAVITY FIX:
+            // A piece only falls if it is currently in EMPTY AIR (0)
+            // AND the space below it is also EMPTY AIR (0).
+            // If grid[p.y][p.x] is solid (non-zero), the piece is "inside" or "hanging on" the block.
+            
+            const isFloatingInAir = grid[p.y][p.x] === 0;
+            const isUnsupported = p.y < ROWS - 1 && grid[p.y + 1][p.x] === 0;
+
+            if (isFloatingInAir && isUnsupported) {
+                p.y++; 
+                stable = false;
+            } else if (p.y >= ROWS - 1 && isFloatingInAir) {
+                // If at bottom and no block, fall into void
+                p.y++;
+            }
+        });
+    }
+
+    // Kill pieces that fell into void (past row 19)
+    chessPieces.forEach(p => {
+        if (!p.alive) return;
+        
+        if (p.y >= ROWS) {
+            p.alive = false;
+            if (p.team === 'player') {
+                endGame("FELL INTO VOID!");
+            } else {
+                score += 50; 
+            }
+        }
+    });
+}
+
+function startPlayerPhase() {
+    phase = 'PLAYER_TURN';
+    updateUI();
+    validMoves = playerPiece.getValidMoves(grid, chessPieces);
+    validMoves.push({x: playerPiece.x, y: playerPiece.y}); 
+}
+
+function handlePlayerClick(e) {
+    if (phase !== 'PLAYER_TURN') return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+    
+    if (clickX > BOARD_WIDTH) return; 
+
+    const x = Math.floor(clickX / BLOCK_SIZE);
+    const y = Math.floor(clickY / BLOCK_SIZE);
+
+    const move = validMoves.find(m => m.x === x && m.y === y);
+    
+    if (move) {
+        const target = chessPieces.find(p => p.x === x && p.y === y && p.team !== 'player' && p.alive);
+        if (target) {
+            target.alive = false;
+            score += 50;
+            createExplosion(x, y, '#FF0000');
+        }
+
+        playerPiece.x = x;
+        playerPiece.y = y;
+        
+        validMoves = [];
+        
+        if (playerPiece.y <= 1) {
+            endGame("ESCAPED THE PIT!");
+        } else {
+            startAIPhase();
+        }
+    }
+}
+
+function startAIPhase() {
+    phase = 'AI_TURN';
+    updateUI();
+
+    setTimeout(() => {
+        const enemies = chessPieces.filter(p => p.team === 'enemy' && p.alive);
+        let bestMove = null;
+        let bestScore = -Infinity;
+        let selectedEnemy = null;
+
+        enemies.forEach(enemy => {
+            const moves = enemy.getValidMoves(grid, chessPieces);
+            
+            moves.forEach(m => {
+                let score = 0;
+                if (m.x === playerPiece.x && m.y === playerPiece.y) score += 1000;
+                const dist = Math.hypot(m.x - playerPiece.x, m.y - playerPiece.y);
+                score -= dist * 10;
+                score += Math.random() * 5;
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = m;
+                    selectedEnemy = enemy;
+                }
+            });
+        });
+
+        if (selectedEnemy && bestMove) {
+            if (bestMove.x === playerPiece.x && bestMove.y === playerPiece.y) {
+                playerPiece.alive = false;
+                createExplosion(playerPiece.x, playerPiece.y, '#FFD700');
+            }
+            selectedEnemy.x = bestMove.x;
+            selectedEnemy.y = bestMove.y;
+        }
+
+        if (!playerPiece.alive) {
+            endGame(`${playerPiece.type.toUpperCase()} CAPTURED`);
+        } else {
+            applyPieceGravity();
+            // Re-check void death after AI move/gravity
+            if (!playerPiece.alive && phase !== 'GAMEOVER') {
+                 // handled in applyPieceGravity mostly
+            } else if (playerPiece.alive) {
+                phase = 'TETRIS';
+                updateUI();
+                spawnTetromino();
+            }
+        }
+
+    }, 300);
+}
+
+function updateUI() {
+    document.getElementById('phase-indicator').innerText = phase.replace('_', ' ');
+    const ind = document.getElementById('phase-indicator');
+    
+    if (phase === 'TETRIS') ind.style.color = '#00ffcc';
+    else if (phase === 'PLAYER_TURN') ind.style.color = '#ffd700';
+    else if (phase === 'AI_TURN') ind.style.color = '#ff4444';
+}
+
+function endGame(reason) {
+    if (phase === 'GAMEOVER') return; // Prevent double trigger
+    phase = 'GAMEOVER';
+    document.getElementById('modal').classList.remove('hidden');
+    document.getElementById('modal-title').innerText = "GAME OVER";
+    document.getElementById('modal-desc').innerHTML = `<span style="color: #e94560; font-size: 16px;">${reason}</span><br><br>FINAL SCORE: ${score}`;
+    document.getElementById('char-select-container').style.display = 'block'; 
+}
+
+// FX
+let particles = [];
+function createExplosion(x, y, color) {
+    for(let i=0; i<15; i++) {
+        particles.push({
+            x: x * BLOCK_SIZE + BLOCK_SIZE/2,
+            y: y * BLOCK_SIZE + BLOCK_SIZE/2,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            life: 1.0,
+            color: color
+        });
+    }
+}
+
+// --- RENDERING ---
+
+function drawSidebar() {
+    ctx.fillStyle = '#111';
+    ctx.fillRect(BOARD_WIDTH, 0, SIDEBAR_WIDTH, BOARD_HEIGHT);
+    ctx.strokeStyle = '#444';
+    ctx.beginPath();
+    ctx.moveTo(BOARD_WIDTH, 0);
+    ctx.lineTo(BOARD_WIDTH, BOARD_HEIGHT);
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px "Press Start 2P"';
+    ctx.textAlign = 'left';
+    ctx.fillText(`SCORE`, BOARD_WIDTH + 20, 30);
+    ctx.fillStyle = '#00ffcc';
+    ctx.fillText(`${score}`, BOARD_WIDTH + 20, 50);
+
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`NEXT DROP`, BOARD_WIDTH + 20, 100);
+    
+    const previewMatrix = createPieceMatrix(nextTetrominoType);
+    const colorIdx = nextTetrominoType + 1;
+    const previewX = BOARD_WIDTH/BLOCK_SIZE + 1.5;
+    const previewY = 4.5;
+    drawMatrix(previewMatrix, {x: previewX, y: previewY}, colorIdx, ctx);
+
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`THREAT`, BOARD_WIDTH + 20, 250);
+    
+    ctx.save();
+    ctx.font = '30px "Press Start 2P"';
+    ctx.textAlign = 'center';
+    
+    // Preview Enemy Style
+    const enX = BOARD_WIDTH + SIDEBAR_WIDTH/2;
+    const enY = 290;
+    
+    ctx.fillStyle = '#000000'; 
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(CHESS_SYMBOLS[nextEnemyType], enX, enY);
+    ctx.fillText(CHESS_SYMBOLS[nextEnemyType], enX, enY);
+
+    ctx.font = '10px "Press Start 2P"';
+    ctx.fillStyle = '#888';
+    ctx.shadowBlur = 0;
+    ctx.fillText(nextEnemyType.toUpperCase(), enX, 320);
+    ctx.restore();
+    
+    ctx.fillStyle = '#666';
+    ctx.fillText("UP: ROTATE", BOARD_WIDTH + 10, BOARD_HEIGHT - 60);
+    ctx.fillText("ARR: MOVE", BOARD_WIDTH + 10, BOARD_HEIGHT - 40);
+    ctx.fillText("CLK: HERO", BOARD_WIDTH + 10, BOARD_HEIGHT - 20);
+}
+
+function update(time = 0) {
+    if (phase === 'GAMEOVER') return;
+    const deltaTime = time - lastTime;
+    lastTime = time;
+
+    if (phase === 'TETRIS') {
+        dropCounter += deltaTime;
+        if (dropCounter > dropInterval) playerDrop();
+    }
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+
+    drawMatrix(grid, {x:0, y:0});
+
+    if (phase === 'TETRIS' && activeTetromino) {
+        drawMatrix(activeTetromino.matrix, activeTetromino.pos, activeTetromino.colorIndex);
+        
+        ctx.globalAlpha = 0.2;
+        let ghostY = activeTetromino.pos.y;
+        while (!collide(grid, {matrix: activeTetromino.matrix, pos: {x: activeTetromino.pos.x, y: ghostY + 1}})) {
+            ghostY++;
+        }
+        drawMatrix(activeTetromino.matrix, {x: activeTetromino.pos.x, y: ghostY}, activeTetromino.colorIndex);
+        ctx.globalAlpha = 1.0;
+    }
+
+    if (phase === 'PLAYER_TURN') {
+        validMoves.forEach(m => {
+            const dx = m.x * BLOCK_SIZE;
+            const dy = m.y * BLOCK_SIZE;
+            ctx.fillStyle = 'rgba(0, 255, 128, 0.3)';
+            ctx.fillRect(dx, dy, BLOCK_SIZE, BLOCK_SIZE);
+            ctx.strokeStyle = '#00FF88';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(dx, dy, BLOCK_SIZE, BLOCK_SIZE);
+        });
+    }
+
+    chessPieces.forEach(p => p.draw(ctx));
+
+    particles.forEach((p, index) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.05;
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.fillRect(p.x, p.y, 4, 4);
+        ctx.globalAlpha = 1.0;
+        if(p.life <= 0) particles.splice(index, 1);
+    });
+
+    drawSidebar();
+
+    requestAnimationFrame(update);
+}
+
+document.addEventListener('keydown', event => {
+    if (phase === 'GAMEOVER') return;
+
+    if([37, 38, 39, 40, 32].indexOf(event.keyCode) > -1) {
+        event.preventDefault();
+    }
+
+    if (phase === 'TETRIS') {
+        if (event.keyCode === 37) playerMove(-1); 
+        else if (event.keyCode === 39) playerMove(1); 
+        else if (event.keyCode === 40) playerDrop(); 
+        else if (event.keyCode === 38) playerRotate(1); 
+        else if (event.keyCode === 32) playerHardDrop();
+    }
+});
+
+canvas.addEventListener('mousedown', handlePlayerClick);
+
+</script>
+</body>
+</html>
