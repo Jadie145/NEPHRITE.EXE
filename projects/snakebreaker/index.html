@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SnakeBreaker: Dual Mode</title>
+    <!-- Import Press Start 2P Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050505;
+            --text-color: #00ffcc;
+            --accent-color: #ff00ff;
+            --snake-color: #00ffcc;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Press Start 2P', cursive; /* Updated Font */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.1);
+            border: 2px solid #333;
+            max-width: 100vw;
+            max-height: 100vh;
+            aspect-ratio: 3/4;
+        }
+
+        canvas {
+            display: block;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 30px;
+            box-sizing: border-box;
+            pointer-events: none;
+            font-size: 14px; /* Adjusted for wider font */
+            text-transform: uppercase;
+            text-shadow: 0 0 10px var(--snake-color);
+            line-height: 1.5;
+        }
+
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px;
+            border: 1px solid var(--snake-color);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: 0 0 50px rgba(0, 255, 204, 0.2);
+            z-index: 10;
+            min-width: 320px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px; /* Adjusted for wider font */
+            color: var(--snake-color);
+            text-shadow: 4px 4px 0px #ff00ff;
+            line-height: 1.4;
+        }
+
+        p { color: #ccc; line-height: 1.8; font-size: 10px; }
+
+        .btn-group {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: transparent;
+            color: var(--snake-color);
+            border: 2px solid var(--snake-color);
+            padding: 15px 15px;
+            font-size: 10px;
+            font-family: inherit;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        button:hover {
+            background: var(--snake-color);
+            color: #000;
+            box-shadow: 0 0 20px var(--snake-color);
+        }
+
+        .hidden { display: none !important; }
+
+        /* Scanline effect */
+        #game-container::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="ui-layer">
+            <div>Score: <span id="scoreVal">0</span></div>
+            <div>Mode: <span id="modeVal" style="color:#ff00ff">AI</span></div>
+        </div>
+
+        <div id="start-screen">
+            <h1>SNAKE BREAKER</h1>
+            <p>Select Operation Mode</p>
+            <div class="btn-group">
+                <button onclick="game.start('PLAYER')">Player Mode</button>
+                <button onclick="game.start('AI')">AI AutoPilot</button>
+            </div>
+            <p style="font-size: 8px; opacity: 0.7; margin-top:15px;">
+                Player Mode: Arrow Keys | Walls Wrap | Body Pass<br>
+                AI Mode: Autonomous | Walls Kill | Self Kill
+            </p>
+        </div>
+
+        <div id="game-over-screen" class="hidden">
+            <h1 style="color: #ff0055; text-shadow: 4px 4px 0 #fff;">GAME OVER</h1>
+            <p id="death-reason" style="font-size: 12px; margin: 10px 0;">Ball Lost.</p>
+            <p style="font-size: 14px;">Final Score: <span id="finalScore">0</span></p>
+            <div class="btn-group">
+                <button onclick="game.restart()">RETRY</button>
+                <button onclick="window.location.reload()">MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            width: 600,
+            height: 800,
+            gridSize: 20,
+            
+            // AI Settings
+            snakeSpeedAI: 20, 
+            ballSpeedBaseAI: 6,
+            
+            // Player Settings
+            snakeSpeedPlayer: 60, // Slower snake update for control
+            ballSpeedBasePlayer: 2.5, // Significantly slower ball for player mode
+            
+            brickRows: 6,
+            brickCols: 8,
+            brickHeight: 30,
+            brickGap: 5,
+            colors: ['#FF0055', '#FF3300', '#FF9900', '#FFFF00', '#00FF00', '#0099FF']
+        };
+
+        class Utils {
+            static rectIntersect(x1, y1, w1, h1, x2, y2, w2, h2) {
+                return x2 < x1 + w1 && x2 + w2 > x1 && y2 < y1 + h1 && y2 + h2 > y1;
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y;
+                this.vx = (Math.random() - 0.5) * 8;
+                this.vy = (Math.random() - 0.5) * 8;
+                this.life = 1.0;
+                this.color = color;
+                this.size = Math.random() * 4 + 2;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                this.life -= 0.02; this.size *= 0.95;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        class Brick {
+            constructor(c, r, width, height, color) {
+                this.x = c * (width + CONFIG.brickGap) + 35;
+                this.y = r * (height + CONFIG.brickGap) + 50;
+                this.w = width; this.h = height;
+                this.color = color;
+                this.active = true;
+            }
+            draw(ctx) {
+                if (!this.active) return;
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 10; ctx.shadowColor = this.color;
+                ctx.fillRect(this.x, this.y, this.w, this.h);
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = "rgba(255,255,255,0.3)";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, this.y, this.w, this.h);
+            }
+        }
+
+        class PowerUp {
+            constructor(x, y, type) {
+                this.x = x; this.y = y;
+                this.type = type; // 'MULTI', 'GROW', 'SLOW'
+                this.size = 12;
+                this.vy = 2.5;
+                this.color = this.getColor();
+                this.text = this.getText();
+            }
+
+            getColor() {
+                if (this.type === 'MULTI') return '#00FFFF'; // Cyan
+                if (this.type === 'GROW') return '#00FF00';  // Green
+                if (this.type === 'SLOW') return '#FF00FF';  // Purple
+                return '#FFF';
+            }
+
+            getText() {
+                if (this.type === 'MULTI') return 'M';
+                if (this.type === 'GROW') return 'G';
+                if (this.type === 'SLOW') return 'S';
+                return '?';
+            }
+
+            update() { this.y += this.vy; }
+
+            draw(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#000';
+                ctx.font = '8px "Press Start 2P"'; // Updated Font
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.text, this.x, this.y + 1); // +1 offset for visual centering
+            }
+        }
+
+        class Ball {
+            constructor(game, x, y, speed, angle = null) {
+                this.game = game;
+                this.r = 6;
+                this.x = x || CONFIG.width / 2;
+                this.y = y || CONFIG.height / 2 + 100;
+                this.speed = speed;
+                this.maxSpeed = 12;
+                
+                // If game is in slow motion, initialize new balls (like Multi-ball) in slow mode
+                if (this.game.slowTimer > 0) {
+                    this.originalSpeed = this.speed;
+                    this.speed = 3; // Slow speed
+                } else {
+                    this.originalSpeed = null;
+                }
+
+                let ang = angle !== null ? angle : -Math.PI / 2 + (Math.random() - 0.5);
+                this.dx = Math.cos(ang) * this.speed;
+                this.dy = Math.sin(ang) * this.speed;
+                this.active = true;
+            }
+
+            update() {
+                if (!this.active) return;
+
+                // Move
+                this.x += this.dx;
+                this.y += this.dy;
+
+                // Walls with Trijection Bounce Check (Deadlock Prevention)
+                if (this.x < this.r) { 
+                    this.x = this.r; 
+                    this.dx *= -1; 
+                    this.normalizeVelocity();
+                }
+                if (this.x > CONFIG.width - this.r) { 
+                    this.x = CONFIG.width - this.r; 
+                    this.dx *= -1; 
+                    this.normalizeVelocity();
+                }
+                if (this.y < this.r) { 
+                    this.y = this.r; 
+                    this.dy *= -1; 
+                }
+                
+                // Floor
+                if (this.y > CONFIG.height + this.r) {
+                    this.active = false; // Ball dies
+                }
+
+                // Bricks
+                if (this.y < CONFIG.height / 2) {
+                    for (let brick of this.game.bricks) {
+                        if (brick.active && this.checkRectCollision(brick.x, brick.y, brick.w, brick.h)) {
+                            brick.active = false;
+                            this.game.spawnParticles(brick.x + brick.w/2, brick.y + brick.h/2, brick.color);
+                            this.game.spawnDrop(brick.x + brick.w/2, brick.y + brick.h/2);
+                            this.game.score += 10;
+                            this.game.updateUI();
+                            
+                            let prevX = this.x - this.dx;
+                            let prevY = this.y - this.dy;
+                            if (prevY < brick.y || prevY > brick.y + brick.h) this.dy *= -1;
+                            else this.dx *= -1;
+
+                            // Speed up slightly only if NOT in slow motion
+                            if (this.game.slowTimer <= 0 && this.speed < this.maxSpeed) {
+                                this.speed += 0.05;
+                                this.normalizeVelocity();
+                            }
+                            
+                            if (this.game.bricks.every(b => !b.active)) {
+                                this.game.gameOver("VICTORY! All Bricks Destroyed.");
+                            }
+                            break; 
+                        }
+                    }
+                }
+
+                // Snake Collision
+                for (let seg of this.game.snake.segments) {
+                    let rx = seg.x * CONFIG.gridSize;
+                    let ry = seg.y * CONFIG.gridSize;
+                    
+                    if (this.checkRectCollision(rx, ry, CONFIG.gridSize, CONFIG.gridSize)) {
+                        this.dy = -Math.abs(this.dy); // Always bounce up
+                        
+                        // Paddle control physics
+                        let hitOffset = (this.x - (rx + CONFIG.gridSize/2)) / (CONFIG.gridSize/2);
+                        this.dx += hitOffset * 2;
+                        this.normalizeVelocity();
+
+                        this.game.spawnParticles(this.x, this.y, '#00ffcc');
+                        break;
+                    }
+                }
+            }
+
+            normalizeVelocity() {
+                let angle = Math.atan2(this.dy, this.dx);
+                
+                // --- TRIJECTION BOUNCE LOGIC (Deadlock Prevention) ---
+                const MIN_ANGLE = 0.25; // ~14 degrees
+                if (Math.abs(angle) < MIN_ANGLE) {
+                    angle = Math.sign(angle || 1) * MIN_ANGLE;
+                }
+                else if (Math.abs(Math.abs(angle) - Math.PI) < MIN_ANGLE) {
+                    angle = (angle > 0) ? (Math.PI - MIN_ANGLE) : (-Math.PI + MIN_ANGLE);
+                }
+
+                this.dx = Math.cos(angle) * this.speed;
+                this.dy = Math.sin(angle) * this.speed;
+            }
+
+            checkRectCollision(rx, ry, rw, rh) {
+                let testX = this.x;
+                let testY = this.y;
+                if (this.x < rx) testX = rx;
+                else if (this.x > rx + rw) testX = rx + rw;
+                if (this.y < ry) testY = ry;
+                else if (this.y > ry + rh) testY = ry + rh;
+                let distX = this.x - testX;
+                let distY = this.y - testY;
+                return (distX * distX + distY * distY) <= (this.r * this.r);
+            }
+
+            draw(ctx) {
+                if (!this.active) return;
+                ctx.fillStyle = '#fff';
+                ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        class Snake {
+            constructor(game) {
+                this.game = game;
+                this.reset();
+            }
+
+            reset() {
+                this.segments = [];
+                this.length = 6;
+                this.dir = { x: 1, y: 0 };
+                this.nextDir = { x: 1, y: 0 };
+                
+                let startX = Math.floor((CONFIG.width / CONFIG.gridSize) / 2);
+                let startY = Math.floor((CONFIG.height / CONFIG.gridSize) - 5);
+
+                for (let i = 0; i < this.length; i++) {
+                    this.segments.push({ x: startX - i, y: startY });
+                }
+            }
+
+            handleInput(key) {
+                if (this.game.mode !== 'PLAYER') return;
+                
+                const up = {x:0, y:-1};
+                const down = {x:0, y:1};
+                const left = {x:-1, y:0};
+                const right = {x:1, y:0};
+
+                // Prevent 180 degree turns
+                if ((key === 'ArrowUp' || key === 'w') && this.dir.y === 0) this.nextDir = up;
+                if ((key === 'ArrowDown' || key === 's') && this.dir.y === 0) this.nextDir = down;
+                if ((key === 'ArrowLeft' || key === 'a') && this.dir.x === 0) this.nextDir = left;
+                if ((key === 'ArrowRight' || key === 'd') && this.dir.x === 0) this.nextDir = right;
+            }
+
+            updateAI() {
+                // ... Existing AI Logic ...
+                if (this.game.mode === 'PLAYER') return;
+
+                let head = this.segments[0];
+                let target = null;
+                // AI targets the first active ball found
+                let ball = this.game.balls.find(b => b.active); 
+
+                // Fallback if no balls
+                if (!ball) { this.nextDir = this.dir; return; }
+
+                let gridW = CONFIG.width / CONFIG.gridSize;
+                let gridH = CONFIG.height / CONFIG.gridSize;
+
+                if (ball.dy > 0 && ball.y > CONFIG.height * 0.4) {
+                    let targetX = Math.floor(ball.x / CONFIG.gridSize);
+                    let targetY = head.y;
+                    if (ball.y > head.y * CONFIG.gridSize) targetY = Math.min(gridH - 1, head.y + 2);
+                    target = { x: targetX, y: targetY };
+                } else {
+                    // Hunt powerups if safe
+                    if (this.game.powerups.length > 0) {
+                        let closest = this.game.powerups[0];
+                        target = { x: Math.floor(closest.x / CONFIG.gridSize), y: Math.floor(closest.y / CONFIG.gridSize) };
+                    } else {
+                        target = { x: Math.floor(gridW / 2), y: Math.floor(gridH - 5) };
+                    }
+                }
+                this.nextDir = this.getBestMoveAI(head, target);
+            }
+
+            getBestMoveAI(head, target) {
+                let moves = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }];
+                let bestMove = this.dir; 
+                let bestScore = -Infinity;
+
+                for (let m of moves) {
+                    if (m.x === -this.dir.x && m.y === -this.dir.y) continue;
+                    let nextX = head.x + m.x;
+                    let nextY = head.y + m.y;
+                    if (!this.isSafeAI(nextX, nextY)) continue;
+                    let dist = Math.abs(nextX - target.x) + Math.abs(nextY - target.y);
+                    let score = -dist;
+                    if (nextX === target.x) score += 2;
+                    score += Math.random() * 0.9;
+                    if (score > bestScore) { bestScore = score; bestMove = m; }
+                }
+                return bestMove;
+            }
+
+            isSafeAI(x, y) {
+                let gridW = CONFIG.width / CONFIG.gridSize;
+                let gridH = CONFIG.height / CONFIG.gridSize;
+                let safeY = (CONFIG.height * 0.4) / CONFIG.gridSize;
+                if (x < 0 || x >= gridW) return false;
+                if (y < safeY || y >= gridH) return false;
+                for (let s of this.segments) if (x === s.x && y === s.y) return false;
+                return true;
+            }
+
+            update() {
+                this.dir = this.nextDir;
+                let head = { x: this.segments[0].x + this.dir.x, y: this.segments[0].y + this.dir.y };
+                let gridWidth = CONFIG.width / CONFIG.gridSize;
+                let gridHeight = CONFIG.height / CONFIG.gridSize;
+                let safeZoneY = (CONFIG.height * 0.4) / CONFIG.gridSize;
+
+                // --- COLLISION LOGIC VARIES BY MODE ---
+
+                // 1. WALLS
+                if (this.game.mode === 'AI') {
+                    if (head.y < safeZoneY || head.x < 0 || head.x >= gridWidth || head.y >= gridHeight) {
+                        this.game.gameOver("AI Hit Wall."); return;
+                    }
+                } else {
+                    // PLAYER MODE: Wrap Around
+                    if (head.x < 0) head.x = gridWidth - 1;
+                    else if (head.x >= gridWidth) head.x = 0;
+                    
+                    if (head.y >= gridHeight) head.y = safeZoneY; // Prevent going too deep
+                    if (head.y < safeZoneY) head.y = gridHeight - 1;
+                }
+
+                // 2. SELF COLLISION
+                if (this.game.mode === 'AI') {
+                    for (let seg of this.segments) {
+                        if (head.x === seg.x && head.y === seg.y) {
+                            this.game.gameOver("AI Bit Itself."); return;
+                        }
+                    }
+                }
+                // PLAYER MODE: Ignores self collision (ghost mode)
+
+                this.segments.unshift(head);
+
+                // Check Item Collision (PowerUps)
+                let headPxX = head.x * CONFIG.gridSize;
+                let headPxY = head.y * CONFIG.gridSize;
+                let ate = false;
+                
+                for (let i = this.game.powerups.length - 1; i >= 0; i--) {
+                    let p = this.game.powerups[i];
+                    // Simple AABB collision for pickup
+                    if (Utils.rectIntersect(headPxX, headPxY, CONFIG.gridSize, CONFIG.gridSize, p.x - p.size, p.y - p.size, p.size*2, p.size*2)) {
+                        this.game.applyPowerUp(p.type);
+                        this.game.powerups.splice(i, 1);
+                        ate = true; 
+                    }
+                }
+
+                if (!ate) {
+                    // If length exceeds current desired length, trim tail
+                    if (this.segments.length > this.length) {
+                        this.segments.pop();
+                    }
+                } else {
+                    this.game.updateUI();
+                }
+            }
+
+            draw(ctx) {
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#00ffcc';
+                
+                for (let i = 0; i < this.segments.length; i++) {
+                    let seg = this.segments[i];
+                    let alpha = 1 - (i / (this.segments.length + 5));
+                    ctx.fillStyle = `rgba(0, 255, 204, ${alpha})`;
+                    if (i === 0) ctx.fillStyle = '#fff';
+
+                    // For wrapping in player mode, don't draw lines across screen
+                    ctx.fillRect(seg.x * CONFIG.gridSize, seg.y * CONFIG.gridSize, CONFIG.gridSize - 1, CONFIG.gridSize - 1);
+                }
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.canvas.width = CONFIG.width;
+                this.canvas.height = CONFIG.height;
+
+                this.snake = new Snake(this);
+                this.balls = [];
+                this.bricks = [];
+                this.powerups = [];
+                this.particles = [];
+                
+                this.mode = 'AI'; // AI or PLAYER
+                this.score = 0;
+                this.isRunning = false;
+                this.lastTime = 0;
+                this.snakeTimer = 0;
+                
+                this.slowTimer = 0; // Timer for Slow power-up
+
+                // Input Listener
+                window.addEventListener('keydown', (e) => this.snake.handleInput(e.key));
+            }
+
+            initBricks() {
+                this.bricks = [];
+                let brickWidth = (CONFIG.width - 70 - (CONFIG.brickCols * CONFIG.brickGap)) / CONFIG.brickCols;
+                for (let r = 0; r < CONFIG.brickRows; r++) {
+                    for (let c = 0; c < CONFIG.brickCols; c++) {
+                        this.bricks.push(new Brick(c, r, brickWidth, CONFIG.brickHeight, CONFIG.colors[r]));
+                    }
+                }
+            }
+
+            spawnParticles(x, y, color) {
+                for (let i = 0; i < 8; i++) this.particles.push(new Particle(x, y, color));
+            }
+
+            spawnDrop(x, y) {
+                // 30% chance for powerup, otherwise nothing (pure score)
+                if (Math.random() < 0.3) {
+                    const types = ['MULTI', 'GROW', 'SLOW'];
+                    const type = types[Math.floor(Math.random() * types.length)];
+                    this.powerups.push(new PowerUp(x, y, type));
+                }
+            }
+
+            applyPowerUp(type) {
+                this.score += 50;
+                if (type === 'GROW') {
+                    this.snake.length += 5;
+                } else if (type === 'MULTI') {
+                    // Spawn 2 balls at snake head
+                    let head = this.snake.segments[0];
+                    let bx = head.x * CONFIG.gridSize;
+                    let by = head.y * CONFIG.gridSize - 10;
+                    let speed = this.balls[0] ? this.balls[0].speed : 5;
+                    this.balls.push(new Ball(this, bx, by, speed, -Math.PI/2 - 0.5));
+                    this.balls.push(new Ball(this, bx, by, speed, -Math.PI/2 + 0.5));
+                } else if (type === 'SLOW') {
+                    // If we are not currently slow, save the current speed as original
+                    if (this.slowTimer <= 0) {
+                        this.balls.forEach(b => {
+                            b.originalSpeed = b.speed;
+                            b.speed = 3; // Fixed slow speed
+                            b.normalizeVelocity();
+                        });
+                    }
+                    // Reset timer to 15 seconds
+                    this.slowTimer = 15;
+                }
+            }
+
+            start(mode) {
+                this.mode = mode;
+                document.getElementById('start-screen').classList.add('hidden');
+                document.getElementById('game-over-screen').classList.add('hidden');
+                document.getElementById('modeVal').innerText = mode;
+                
+                this.score = 0;
+                this.slowTimer = 0;
+                this.snake.reset();
+                this.initBricks();
+                this.powerups = [];
+                this.particles = [];
+                
+                // Ball Setup
+                let speed = (mode === 'AI') ? CONFIG.ballSpeedBaseAI : CONFIG.ballSpeedBasePlayer;
+                this.balls = [new Ball(this, CONFIG.width/2, CONFIG.height/2 + 100, speed)];
+                
+                this.isRunning = true;
+                this.updateUI();
+                
+                requestAnimationFrame(t => this.loop(t));
+            }
+
+            restart() {
+                this.start(this.mode);
+            }
+
+            gameOver(reason) {
+                this.isRunning = false;
+                document.getElementById('death-reason').innerText = reason;
+                document.getElementById('finalScore').innerText = this.score;
+                document.getElementById('game-over-screen').classList.remove('hidden');
+            }
+
+            updateUI() {
+                document.getElementById('scoreVal').innerText = this.score;
+            }
+
+            loop(timestamp) {
+                if (!this.isRunning) return;
+
+                let dt = timestamp - this.lastTime;
+                this.lastTime = timestamp;
+
+                // --- Slow Timer Logic ---
+                if (this.slowTimer > 0) {
+                    this.slowTimer -= dt / 1000;
+                    if (this.slowTimer <= 0) {
+                        this.slowTimer = 0;
+                        // Restore Ball Speeds
+                        this.balls.forEach(b => {
+                            if (b.originalSpeed) {
+                                b.speed = b.originalSpeed;
+                                b.originalSpeed = null;
+                                b.normalizeVelocity();
+                            }
+                        });
+                    }
+                }
+
+                // Update Snake
+                let speedLimit = (this.mode === 'AI') ? CONFIG.snakeSpeedAI : CONFIG.snakeSpeedPlayer;
+                this.snakeTimer += dt;
+                
+                if (this.snakeTimer > speedLimit) {
+                    this.snake.updateAI();
+                    this.snake.update();
+                    this.snakeTimer = 0;
+                }
+
+                // Update Balls
+                let activeBalls = 0;
+                this.balls.forEach(b => {
+                    b.update();
+                    if(b.active) activeBalls++;
+                });
+                
+                if (activeBalls === 0) {
+                    this.gameOver("All Balls Lost.");
+                }
+
+                this.particles.forEach(p => p.update());
+                this.particles = this.particles.filter(p => p.life > 0);
+                
+                this.powerups.forEach(p => p.update());
+                this.powerups = this.powerups.filter(p => p.y < CONFIG.height);
+
+                this.draw();
+                requestAnimationFrame(t => this.loop(t));
+            }
+
+            draw() {
+                this.ctx.fillStyle = 'rgba(5, 5, 5, 0.4)';
+                this.ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+
+                let safeZoneY = (CONFIG.height * 0.4);
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, safeZoneY);
+                this.ctx.lineTo(CONFIG.width, safeZoneY);
+                this.ctx.strokeStyle = '#330000';
+                this.ctx.setLineDash([10, 10]);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+
+                this.bricks.forEach(b => b.draw(this.ctx));
+                this.powerups.forEach(p => p.draw(this.ctx));
+                this.particles.forEach(p => p.draw(this.ctx));
+                this.snake.draw(this.ctx);
+                this.balls.forEach(b => b.draw(this.ctx));
+
+                // Draw Slow Timer Indicator
+                if (this.slowTimer > 0) {
+                    this.ctx.fillStyle = '#FF00FF'; // Purple
+                    this.ctx.font = '16px "Press Start 2P"'; // Updated Font
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(`SLOW: ${Math.ceil(this.slowTimer)}s`, CONFIG.width / 2, 40);
+                }
+            }
+        }
+
+        const game = new Game();
+    </script>
+</body>
+</html>
