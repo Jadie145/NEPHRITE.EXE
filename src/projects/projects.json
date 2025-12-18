@@ -8,12 +8,12 @@
     "size": "7.22 MB"
   },
   {
-    "title": "Parcer Place",
-    "image": "/projects/place/preview.png",
-    "link": "/projects/place/index.html",
-    "mode": "adaptive",
+    "title": "SnakeBreaker",
+    "image": "/projects/snakebreaker/preview.png",
+    "link": "/projects/snakebreaker/index.html",
+    "mode": "arcade",
     "version": "v1.9",
-    "size": "8.85 MB"
+    "size": "5.33 MB"
   },
   {
     "title": "Chestris",
