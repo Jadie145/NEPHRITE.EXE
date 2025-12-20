@@ -178,78 +178,115 @@ const APPS = [
   { id: 'asteroids', label: 'Astro', icon: Rocket, color: 'bg-indigo-500' },
 ];
 
-// --- Calculator App (RESPONSIVE FIX) ---
+// --- Calculator App ---
 const CalculatorApp = ({ onClose, playSound, playNav, playConfirm }) => {
     const [display, setDisplay] = useState('0');
     const [prevValue, setPrevValue] = useState(null);
     const [operator, setOperator] = useState(null);
     const [waitingForOperand, setWaitingForOperand] = useState(false);
+    // New state to show the full equation string for visual feedback
+    const [equation, setEquation] = useState('');
 
-    const inputDigit = (digit) => {
+    const inputDigit = useCallback((digit) => {
         playNav();
         if (waitingForOperand) {
             setDisplay(String(digit));
             setWaitingForOperand(false);
+            setEquation(prev => prev + digit);
         } else {
-            setDisplay(display === '0' ? String(digit) : display + digit);
+            const newDisplay = display === '0' ? String(digit) : display + digit;
+            setDisplay(newDisplay);
+            if (display === '0' && equation === '') setEquation(String(digit));
+            else setEquation(prev => prev + digit);
         }
-    };
-    const performOperation = (nextOperator) => {
+    }, [display, equation, waitingForOperand, playNav]);
+
+    const performOperation = useCallback((nextOperator) => {
         playConfirm();
         const inputValue = parseFloat(display);
-        if (prevValue === null) setPrevValue(inputValue);
-        else if (operator) {
+
+        if (prevValue === null) {
+            setPrevValue(inputValue);
+            setEquation(String(inputValue) + nextOperator);
+        } else if (operator) {
             const currentValue = prevValue || 0;
             const CalculatorOperations = { '/': (p, n) => p / n, '*': (p, n) => p * n, '+': (p, n) => p + n, '-': (p, n) => p - n, '=': (p, n) => n };
+            
+            if (nextOperator === '=') {
+                 const newValue = CalculatorOperations[operator](currentValue, inputValue);
+                 setPrevValue(null);
+                 setDisplay(String(newValue));
+                 setEquation(String(newValue)); 
+                 setOperator(null);
+                 setWaitingForOperand(true); 
+                 return;
+            }
+
             const newValue = CalculatorOperations[operator](currentValue, inputValue);
             setPrevValue(newValue);
             setDisplay(String(newValue));
+            setEquation(String(newValue) + nextOperator);
+        } else {
+             setEquation(String(inputValue) + nextOperator);
         }
+
         setWaitingForOperand(true);
         setOperator(nextOperator);
-    };
-    const clear = () => { playSound(); setDisplay('0'); setPrevValue(null); setOperator(null); setWaitingForOperand(false); }
+    }, [display, prevValue, operator, playConfirm]);
+
+    const clear = useCallback(() => { 
+        playSound(); 
+        setDisplay('0'); 
+        setEquation('');
+        setPrevValue(null); 
+        setOperator(null); 
+        setWaitingForOperand(false); 
+    }, [playSound]);
+
+    // Bind Physical Buttons to Calculator Functions
+    useEffect(() => {
+        const handleController = (e) => {
+            const { action } = e.detail;
+            if (action === 'BTN_START') clear();
+            if (action === 'BTN_B') onClose();
+            if (action === 'BTN_A') performOperation('=');
+        };
+        window.addEventListener('RETRO_CONTROLLER', handleController);
+        return () => window.removeEventListener('RETRO_CONTROLLER', handleController);
+    }, [clear, onClose, performOperation]);
 
     return (
          <div className="flex flex-col h-full bg-[#9ea792] font-mono text-[#2c3327] overflow-hidden">
-            {/* Header - Compact */}
             <div className="px-2 py-1 flex items-center justify-between border-b-2 border-[#2c3327]/10 shrink-0">
                 <button onClick={() => { playSound(); onClose(); }} className="hover:bg-[#2c3327]/10 rounded"><ChevronLeft size={14}/></button>
                 <span className="font-bold text-[10px] tracking-widest">CALC-86</span>
                 <div className="w-4"></div>
             </div>
-            
-            <div className="flex-1 flex flex-col p-2 min-h-0">
-                 {/* Display Screen - Responsive Height */}
-                 <div className="bg-[#8b9680]/40 border-2 border-[#2c3327] rounded-sm mb-2 h-10 sm:h-12 shrink-0 flex items-center justify-end px-2 text-xl sm:text-2xl font-bold font-mono shadow-inner tracking-widest overflow-hidden">
-                    {display}
+            {/* Added bottom padding to lift content above the bezel area */}
+            <div className="flex-1 flex flex-col p-2 min-h-0 pb-6">
+                 {/* Display Screen */}
+                 <div className="bg-[#8b9680]/40 border-2 border-[#2c3327] rounded-sm mb-2 h-12 shrink-0 flex flex-col items-end justify-center px-2 font-mono shadow-inner overflow-hidden">
+                    <span className="text-[10px] opacity-70 h-3 leading-none">{equation}</span>
+                    <span className="text-xl sm:text-2xl font-bold leading-none tracking-widest">{display}</span>
                  </div>
-                 
-                 {/* Keypad - Flex Grow to Fill */}
                  <div className="grid grid-cols-4 gap-1 flex-1 min-h-0">
                      {['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+'].map((btn) => (
                          <button 
-                            key={btn}
-                            onClick={() => {
-                                if (/\d/.test(btn) || btn === '.') inputDigit(btn);
-                                else if (btn === '=') performOperation('=');
-                                else performOperation(btn);
-                            }}
-                            className={`
-                                rounded-sm border-2 border-[#2c3327] active:translate-y-[1px] transition-all font-bold text-sm sm:text-lg flex items-center justify-center shadow-[1px_1px_0px_rgba(44,51,39,0.2)]
-                                ${['/','*','-','+','='].includes(btn) 
-                                    ? 'bg-[#2c3327] text-[#9ea792]' 
-                                    : 'hover:bg-[#2c3327]/10'}
-                            `}
-                         >
-                             {btn}
-                         </button>
+                            key={btn} 
+                            onClick={() => { 
+                                if (/\d/.test(btn) || btn === '.') inputDigit(btn); 
+                                else performOperation(btn); 
+                            }} 
+                            className={`rounded-sm border-2 border-[#2c3327] active:translate-y-[1px] transition-all font-bold text-sm sm:text-lg flex items-center justify-center shadow-[1px_1px_0px_rgba(44,51,39,0.2)] ${['/','*','-','+','='].includes(btn) ? 'bg-[#2c3327] text-[#9ea792]' : 'hover:bg-[#2c3327]/10'}`}
+                        >
+                            {btn}
+                        </button>
                      ))}
                      <button 
                         onClick={clear} 
-                        className="col-span-4 border-2 border-[#2c3327] text-[#2c3327] font-bold text-[10px] sm:text-xs rounded-sm active:translate-y-[1px] hover:bg-[#2c3327] hover:text-[#9ea792] transition-colors uppercase tracking-widest flex items-center justify-center"
+                        className="col-span-4 border-2 border-[#2c3327] text-[#2c3327] font-bold text-[10px] sm:text-xs rounded-sm active:translate-y-[1px] hover:bg-[#2c3327] hover:text-[#9ea792] transition-colors uppercase tracking-widest flex items-center justify-center py-2"
                      >
-                        Reset
+                        Reset (Start)
                      </button>
                  </div>
             </div>
@@ -257,7 +294,7 @@ const CalculatorApp = ({ onClose, playSound, playNav, playConfirm }) => {
     );
 };
 
-// --- Micro Snake+ Game (RESPONSIVE FIX) ---
+// --- Micro Snake+ Game ---
 const SnakeGame = ({ onClose, playNav, playClick, playConfirm, playCancel, playEat, playCrash }) => {
     const canvasRef = useRef(null);
     const [gameState, setGameState] = useState('MENU');
@@ -294,7 +331,14 @@ const SnakeGame = ({ onClose, playNav, playClick, playConfirm, playCancel, playE
 
     const generateFood = (currentSnake) => {
         let newFood, isSafe;
-        do { newFood = { x: Math.floor(Math.random() * tileCountX), y: Math.floor(Math.random() * tileCountY) }; isSafe = true;
+        do { 
+            // Avoid top row (y=0) to prevent HUD overlap
+            // Avoid bottom row (y=tileCountY-1) to prevent "gray area" overlap
+            newFood = { 
+                x: Math.floor(Math.random() * tileCountX), 
+                y: Math.floor(Math.random() * (tileCountY - 2)) + 1 
+            }; 
+            isSafe = true;
             for (let part of currentSnake) if (part.x === newFood.x && part.y === newFood.y) { isSafe = false; break; }
         } while (!isSafe);
         setFood(newFood);
@@ -325,7 +369,9 @@ const SnakeGame = ({ onClose, playNav, playClick, playConfirm, playCancel, playE
         ctx.fillStyle = '#9ea792'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#2c3327';
         snake.forEach((part) => { ctx.fillRect(part.x * gridSize + 1, part.y * gridSize + 1, gridSize - 2, gridSize - 2); });
-        if (gameState !== 'PLAYING' || Math.floor(Date.now() / 200) % 2 === 0) {
+        
+        // Draw Food (Solid - removed blinking for better visibility)
+        if (gameState !== 'PLAYING' || true) {
              const cx = food.x * gridSize + gridSize/2, cy = food.y * gridSize + gridSize/2, r = gridSize/3;
              ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
         }
@@ -341,7 +387,6 @@ const SnakeGame = ({ onClose, playNav, playClick, playConfirm, playCancel, playE
                 <span className="text-xs font-bold">HI:{highScore}</span>
             </div>
             <div className="flex-1 flex items-center justify-center p-1">
-                 {/* Added responsive classes to canvas */}
                  <canvas ref={canvasRef} width={tileCountX * gridSize} height={tileCountY * gridSize} className="border-2 border-[#2c3327]/20 w-full h-full object-contain"/>
             </div>
             {gameState === 'MENU' && <div className="absolute inset-0 bg-[#9ea792]/90 flex flex-col items-center justify-center text-[#2c3327] animate-in fade-in"><Gamepad2 size={48} className="mb-2" /><h1 className="text-2xl font-bold tracking-tighter">SNAKE+</h1><p className="text-xs mt-4 animate-pulse">PRESS A TO START</p></div>}
@@ -351,14 +396,13 @@ const SnakeGame = ({ onClose, playNav, playClick, playConfirm, playCancel, playE
     );
 };
 
-// --- Micro Asteroids Game (UPDATED STYLE) ---
+// --- Micro Asteroids Game ---
 const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCrash, playThrust, playHyperspace }) => {
     const canvasRef = useRef(null);
     const [gameState, setGameState] = useState('MENU');
     const [score, setScore] = useState(0);
     const [highScore, setHighScore] = useState(parseInt(localStorage.getItem('asteroids_highscore') || '0'));
     
-    // Mutable Game State (Performance)
     const gameRef = useRef({
         ship: { x: 160, y: 120, a: 0, xv: 0, yv: 0, thrust: false, shield: 0, cooldown: 0 },
         asteroids: [],
@@ -371,7 +415,6 @@ const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCras
         gameRef.current.ship = { x: 160, y: 120, a: -Math.PI/2, xv: 0, yv: 0, thrust: false, shield: 0, cooldown: 0 };
         gameRef.current.bullets = [];
         gameRef.current.particles = [];
-        // Create initial asteroids
         const asteroids = [];
         for(let i=0; i<4; i++) {
             asteroids.push({
@@ -403,30 +446,22 @@ const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCras
         const g = gameRef.current;
         const w = 320, h = 240;
 
-        // Ship Logic
         if (gameState === 'PLAYING') {
             if (g.ship.thrust) {
                 g.ship.xv += Math.cos(g.ship.a) * 0.1;
                 g.ship.yv += Math.sin(g.ship.a) * 0.1;
-                // Add particles
                 g.particles.push({x: g.ship.x - Math.cos(g.ship.a)*8, y: g.ship.y - Math.sin(g.ship.a)*8, xv: -g.ship.xv + (Math.random()-0.5), yv: -g.ship.yv + (Math.random()-0.5), life: 10 });
             }
-            // Friction
             g.ship.xv *= 0.99;
             g.ship.yv *= 0.99;
-            // Move
             g.ship.x += g.ship.xv;
             g.ship.y += g.ship.yv;
-            // Wrap
             if (g.ship.x < 0) g.ship.x += w; if (g.ship.x > w) g.ship.x -= w;
             if (g.ship.y < 0) g.ship.y += h; if (g.ship.y > h) g.ship.y -= h;
-            // Cooldown
             if (g.ship.cooldown > 0) g.ship.cooldown--;
-            // Shield
             if (g.ship.shield > 0) g.ship.shield--;
         }
 
-        // Bullets
         for(let i = g.bullets.length - 1; i >= 0; i--) {
             let b = g.bullets[i];
             b.x += b.xv; b.y += b.yv;
@@ -436,45 +471,35 @@ const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCras
             if (b.life <= 0) g.bullets.splice(i, 1);
         }
 
-        // Asteroids
         for(let i = g.asteroids.length - 1; i >= 0; i--) {
             let a = g.asteroids[i];
             a.x += a.xv; a.y += a.yv;
             if (a.x < 0) a.x += w; if (a.x > w) a.x -= w;
             if (a.y < 0) a.y += h; if (a.y > h) a.y -= h;
             
-            // Collision Ship
             if (gameState === 'PLAYING' && dist(g.ship.x, g.ship.y, a.x, a.y) < a.r + 8) {
                 if (g.ship.shield > 0) {
-                    // Bounce
                     const ang = Math.atan2(g.ship.y - a.y, g.ship.x - a.x);
                     g.ship.xv = Math.cos(ang) * 3;
                     g.ship.yv = Math.sin(ang) * 3;
-                    playCrash(); // Shield hit sound
+                    playCrash();
                 } else {
-                    // Die
                     explode(g.ship.x, g.ship.y, 20);
                     playCrash();
                     setGameState('GAME_OVER');
                 }
             }
 
-            // Collision Bullets
             for(let j = g.bullets.length - 1; j >= 0; j--) {
                 if (dist(g.bullets[j].x, g.bullets[j].y, a.x, a.y) < a.r) {
-                    // Hit!
                     explode(a.x, a.y, a.r);
                     playCrash();
                     g.bullets.splice(j, 1);
-                    
-                    // Score
                     setScore(s => {
                         const ns = s + (32 - a.r) * 10;
                         if (ns > highScore) { setHighScore(ns); localStorage.setItem('asteroids_highscore', ns.toString()); }
                         return ns;
                     });
-
-                    // Split
                     if (a.r > 8) {
                         for(let k=0; k<2; k++) {
                             g.asteroids.push({
@@ -491,7 +516,6 @@ const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCras
             }
         }
         
-        // Particles
         for(let i = g.particles.length - 1; i >= 0; i--) {
             let p = g.particles[i];
             p.x += p.xv; p.y += p.yv;
@@ -499,12 +523,11 @@ const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCras
             if (p.life <= 0) g.particles.splice(i, 1);
         }
 
-        // Respawn Asteroids if cleared
         if (g.asteroids.length === 0 && gameState === 'PLAYING') {
             for(let i=0; i<4; i++) {
                 g.asteroids.push({
                     x: Math.random() * w,
-                    y: (Math.random() > 0.5 ? 0 : h), // Spawn edges
+                    y: (Math.random() > 0.5 ? 0 : h),
                     xv: (Math.random() - 0.5) * 2,
                     yv: (Math.random() - 0.5) * 2,
                     r: 16,
@@ -527,7 +550,6 @@ const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCras
 
     const dist = (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2);
 
-    // Render Loop
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -536,65 +558,30 @@ const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCras
 
         const loop = () => {
             update();
-            
-            // Draw Background (LCD Style)
-            ctx.fillStyle = '#9ea792'; // LCD Green
-            ctx.fillRect(0, 0, 320, 240);
-            
-            // Setup Styles
-            ctx.strokeStyle = '#2c3327'; // Dark LCD
-            ctx.lineWidth = 1.5;
-            ctx.shadowBlur = 0; // No glow for authentic LCD look
-
+            ctx.fillStyle = '#9ea792'; ctx.fillRect(0, 0, 320, 240);
+            ctx.strokeStyle = '#2c3327'; ctx.lineWidth = 1.5; ctx.shadowBlur = 0;
             const g = gameRef.current;
 
-            // Draw Ship
             if (gameState === 'PLAYING') {
                 ctx.save();
                 ctx.translate(g.ship.x, g.ship.y);
                 ctx.rotate(g.ship.a);
-                ctx.beginPath();
-                ctx.moveTo(8, 0);
-                ctx.lineTo(-6, 5);
-                ctx.lineTo(-4, 0);
-                ctx.lineTo(-6, -5);
-                ctx.closePath();
-                ctx.stroke();
-                
-                // Shield
+                ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-6, 5); ctx.lineTo(-4, 0); ctx.lineTo(-6, -5); ctx.closePath(); ctx.stroke();
                 if (g.ship.shield > 0) {
-                    ctx.beginPath();
-                    ctx.arc(0, 0, 12, 0, Math.PI*2);
-                    ctx.strokeStyle = `rgba(44, 51, 39, ${g.ship.shield/30})`;
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI*2); ctx.strokeStyle = `rgba(44, 51, 39, ${g.ship.shield/30})`; ctx.stroke();
                 }
                 ctx.restore();
             }
 
-            // Draw Asteroids
-            ctx.strokeStyle = '#2c3327';
             for(let a of g.asteroids) {
-                ctx.save();
-                ctx.translate(a.x, a.y);
-                ctx.beginPath();
-                ctx.moveTo(a.verts[0].x, a.verts[0].y);
+                ctx.save(); ctx.translate(a.x, a.y); ctx.beginPath(); ctx.moveTo(a.verts[0].x, a.verts[0].y);
                 for(let v of a.verts) ctx.lineTo(v.x, v.y);
-                ctx.closePath();
-                ctx.stroke();
-                ctx.restore();
+                ctx.closePath(); ctx.stroke(); ctx.restore();
             }
 
-            // Draw Bullets
             ctx.fillStyle = '#2c3327';
-            for(let b of g.bullets) {
-                ctx.fillRect(b.x-1, b.y-1, 2, 2);
-            }
-
-            // Draw Particles
-            for(let p of g.particles) {
-                ctx.fillStyle = `rgba(44, 51, 39, ${p.life/30})`;
-                ctx.fillRect(p.x, p.y, 1, 1);
-            }
+            for(let b of g.bullets) ctx.fillRect(b.x-1, b.y-1, 2, 2);
+            for(let p of g.particles) { ctx.fillStyle = `rgba(44, 51, 39, ${p.life/30})`; ctx.fillRect(p.x, p.y, 1, 1); }
 
             rAF = requestAnimationFrame(loop);
         };
@@ -602,7 +589,6 @@ const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCras
         return () => cancelAnimationFrame(rAF);
     }, [gameState]);
 
-    // Controller
     useEffect(() => {
         const handleController = (e) => {
             const { action } = e.detail;
@@ -611,41 +597,25 @@ const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCras
             if (action === 'DPAD_L') g.ship.a -= 0.3;
             if (action === 'DPAD_R') g.ship.a += 0.3;
             if (action === 'DPAD_U') { g.ship.thrust = true; playThrust(); setTimeout(() => g.ship.thrust = false, 150); }
-            if (action === 'DPAD_D') { g.ship.xv *= 0.5; g.ship.yv *= 0.5; } // Brake
+            if (action === 'DPAD_D') { g.ship.xv *= 0.5; g.ship.yv *= 0.5; }
             
             if (action === 'BTN_A' && gameState === 'PLAYING') {
                 if (g.ship.cooldown <= 0) {
-                    g.bullets.push({ 
-                        x: g.ship.x + Math.cos(g.ship.a)*10, 
-                        y: g.ship.y + Math.sin(g.ship.a)*10, 
-                        xv: Math.cos(g.ship.a)*4, 
-                        yv: Math.sin(g.ship.a)*4, 
-                        life: 60 
-                    });
+                    g.bullets.push({ x: g.ship.x + Math.cos(g.ship.a)*10, y: g.ship.y + Math.sin(g.ship.a)*10, xv: Math.cos(g.ship.a)*4, yv: Math.sin(g.ship.a)*4, life: 60 });
                     g.ship.cooldown = 10;
                     playLaser();
                 }
             }
             if (action === 'BTN_B' && gameState === 'PLAYING') {
-                // Hyperspace
-                g.ship.x = Math.random() * 320;
-                g.ship.y = Math.random() * 240;
-                g.ship.xv = 0; g.ship.yv = 0;
-                playHyperspace();
+                g.ship.x = Math.random() * 320; g.ship.y = Math.random() * 240; g.ship.xv = 0; g.ship.yv = 0; playHyperspace();
             }
             if (action === 'BTN_X' && gameState === 'PLAYING') {
-                // Shield
-                if (g.ship.shield <= 0) {
-                    g.ship.shield = 100; // frames
-                    playNav();
-                }
+                if (g.ship.shield <= 0) { g.ship.shield = 100; playNav(); }
             }
-
             if (action === 'BTN_START') {
                  if (gameState === 'MENU' || gameState === 'GAME_OVER') initGame();
-                 else if (gameState === 'PLAYING') setGameState('MENU'); // Pause acts as menu for now
+                 else if (gameState === 'PLAYING') setGameState('MENU');
             }
-            // Exit logic via Main App (B in menu)
             if (action === 'BTN_B' && gameState !== 'PLAYING') onClose();
         };
         window.addEventListener('RETRO_CONTROLLER', handleController);
@@ -654,22 +624,18 @@ const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCras
 
     return (
         <div className="flex flex-col h-full bg-[#9ea792] font-mono relative overflow-hidden">
-            {/* HUD */}
             <div className="absolute top-2 left-2 right-2 flex justify-between text-[#2c3327] z-10 pointer-events-none opacity-80">
                 <span className="text-xs font-bold tracking-widest">SCORE:{score}</span>
                 <span className="text-xs font-bold">HI:{highScore}</span>
             </div>
-            
             <div className="flex-1 flex items-center justify-center p-1">
                  <canvas ref={canvasRef} width={320} height={240} className="w-full h-full object-contain border-2 border-[#2c3327]/20" />
             </div>
-
-            {/* UI Overlays */}
             {gameState === 'MENU' && (
                 <div className="absolute inset-0 bg-[#9ea792]/90 flex flex-col items-center justify-center text-[#2c3327] animate-in fade-in">
                     <Rocket size={48} className="mb-2 animate-bounce" />
                     <h1 className="text-2xl font-bold tracking-tighter">ASTRO-VECTOR</h1>
-                    <p className="text-xs mt-4 animate-pulse">PRESS START</p>
+                    <p className="text-xs mt-4 animate-pulse">PRESS A TO START</p>
                     <div className="mt-8 text-[10px] space-y-1 text-center opacity-70">
                         <p>D-PAD: PILOT</p>
                         <p>A: FIRE | B: WARP</p>
@@ -681,7 +647,7 @@ const MicroAsteroidsGame = ({ onClose, playNav, playConfirm, playLaser, playCras
                 <div className="absolute inset-0 bg-[#9ea792]/90 flex flex-col items-center justify-center text-[#2c3327] animate-in zoom-in-95">
                     <h2 className="text-2xl font-bold tracking-widest">DESTROYED</h2>
                     <p className="text-sm font-bold mt-2">FINAL: {score}</p>
-                    <p className="text-xs mt-6 animate-pulse">PRESS START</p>
+                    <p className="text-xs mt-6 animate-pulse">PRESS A TO RETRY</p>
                 </div>
             )}
         </div>
@@ -730,7 +696,7 @@ const Keychain = ({ anchorRef }) => {
                 <div className="absolute inset-0 rounded-full border-[6px] border-gray-400 bg-transparent shadow-sm"></div>
                 <div className="absolute top-full mt-[-5px] bg-yellow-400 w-12 h-14 rounded-lg border-2 border-orange-500 shadow-lg flex flex-col items-center justify-center transform group-hover:rotate-6 transition-transform origin-top">
                      <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-orange-200">
-                        <span className="text-xl">👾</span>
+                        <span className="text-xl">🧡</span>
                      </div>
                 </div>
              </div>
@@ -767,51 +733,69 @@ export default function RetroHandheld() {
     };
   }, [initAudio]);
 
-  // Keyboard Navigation / Dispatcher
+  // Unified Controller Input Handler (Handles both UI Buttons and Keyboard)
+  const handleControllerInput = useCallback((action) => {
+      initAudio();
+      
+      // If an app is active, dispatch event to it (Game logic, etc.)
+      if (activeAppId) {
+          window.dispatchEvent(new CustomEvent('RETRO_CONTROLLER', { detail: { action } }));
+          return;
+      }
+
+      // OS Navigation Logic
+      if (action === 'DPAD_R' || action === 'DPAD_D') {
+          playNav();
+          setSelectedApp(prev => (prev + 1) % APPS.length);
+      }
+      else if (action === 'DPAD_L' || action === 'DPAD_U') {
+          playNav();
+          setSelectedApp(prev => (prev - 1 + APPS.length) % APPS.length);
+      }
+      else if (action === 'BTN_A' || action === 'BTN_START') {
+          playConfirm();
+          setActiveAppId(APPS[selectedApp].id);
+      }
+      else if (action === 'BTN_X') {
+          playClick();
+          setBacklight(prev => !prev);
+      }
+      else if (action === 'BTN_Y') {
+           playClick();
+           const random = Math.floor(Math.random() * APPS.length);
+           handleAppClick(random);
+      }
+  }, [activeAppId, selectedApp, playNav, playConfirm, playClick, setBacklight, initAudio]);
+
+  // Keyboard Event Listener
   useEffect(() => {
     const handleKeyDown = (e) => {
-        initAudio();
+        initAudio(); // Ensure audio context is ready
+        
+        let action = null;
+        const key = e.key.toLowerCase();
 
-        if (activeAppId) {
-            if (e.key === 'Backspace' || e.key === 'Escape') {
-                window.dispatchEvent(new CustomEvent('RETRO_CONTROLLER', { detail: { action: 'BTN_B' } }));
-            }
-            if (e.key === 'ArrowUp') window.dispatchEvent(new CustomEvent('RETRO_CONTROLLER', { detail: { action: 'DPAD_U' } }));
-            if (e.key === 'ArrowDown') window.dispatchEvent(new CustomEvent('RETRO_CONTROLLER', { detail: { action: 'DPAD_D' } }));
-            if (e.key === 'ArrowLeft') window.dispatchEvent(new CustomEvent('RETRO_CONTROLLER', { detail: { action: 'DPAD_L' } }));
-            if (e.key === 'ArrowRight') window.dispatchEvent(new CustomEvent('RETRO_CONTROLLER', { detail: { action: 'DPAD_R' } }));
-            if (e.key === 'Enter') window.dispatchEvent(new CustomEvent('RETRO_CONTROLLER', { detail: { action: 'BTN_START' } })); // Enter mapped to Start for Asteroids
-            if (e.key === ' ') window.dispatchEvent(new CustomEvent('RETRO_CONTROLLER', { detail: { action: 'BTN_A' } })); // Space for Action
-            if (e.key === 'z') window.dispatchEvent(new CustomEvent('RETRO_CONTROLLER', { detail: { action: 'BTN_B' } })); 
-            if (e.key === 'x') window.dispatchEvent(new CustomEvent('RETRO_CONTROLLER', { detail: { action: 'BTN_X' } })); 
-            
-            return;
-        }
+        // New Mapping
+        if (e.key === 'ArrowUp') action = 'DPAD_U';
+        else if (e.key === 'ArrowDown') action = 'DPAD_D';
+        else if (e.key === 'ArrowLeft') action = 'DPAD_L';
+        else if (e.key === 'ArrowRight') action = 'DPAD_R';
+        else if (key === 'z') action = 'BTN_A';      // A -> z
+        else if (key === 'x') action = 'BTN_B';      // B -> x
+        else if (key === 'c') action = 'BTN_X';      // X -> c
+        else if (key === 'v') action = 'BTN_Y';      // Y -> v
+        else if (e.key === 'Enter') action = 'BTN_START'; // Start -> Enter
+        
+        // Safety / Fallbacks
+        else if (e.key === 'Backspace' || e.key === 'Escape') action = 'BTN_B';
 
-        const cols = 2; 
-        switch(e.key) {
-            case 'ArrowRight': 
-                playNav();
-                setSelectedApp(prev => (prev + 1) % APPS.length); 
-                break;
-            case 'ArrowLeft': 
-                playNav();
-                setSelectedApp(prev => (prev - 1 + APPS.length) % APPS.length); 
-                break;
-            case 'ArrowDown': 
-            case 'ArrowUp':
-                playNav();
-                setSelectedApp(prev => (prev + 1) % APPS.length);
-                break;
-            case 'Enter': 
-                playConfirm();
-                setActiveAppId(APPS[selectedApp].id); 
-                break;
+        if (action) {
+            handleControllerInput(action);
         }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedApp, activeAppId, playNav, playConfirm, playCancel, initAudio]);
+  }, [handleControllerInput, initAudio]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -822,32 +806,6 @@ export default function RetroHandheld() {
     playConfirm();
     setSelectedApp(index);
     setActiveAppId(APPS[index].id);
-  };
-
-  const handleControllerInput = (action) => {
-      initAudio();
-      
-      if (activeAppId) {
-          window.dispatchEvent(new CustomEvent('RETRO_CONTROLLER', { detail: { action } }));
-          return;
-      }
-
-      if (action === 'DPAD_R' || action === 'DPAD_D') {
-          playNav();
-          setSelectedApp(prev => (prev + 1) % APPS.length);
-      }
-      if (action === 'DPAD_L' || action === 'DPAD_U') {
-          playNav();
-          setSelectedApp(prev => (prev - 1 + APPS.length) % APPS.length);
-      }
-      if (action === 'BTN_A') {
-          playConfirm();
-          setActiveAppId(APPS[selectedApp].id);
-      }
-      if (action === 'BTN_X') {
-          playClick();
-          setBacklight(!backlight);
-      }
   };
 
   return (
