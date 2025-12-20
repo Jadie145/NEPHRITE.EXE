@@ -799,8 +799,17 @@ function updateUI() {
 function endGame(reason) {
     if (phase === 'GAMEOVER') return; // Prevent double trigger
     phase = 'GAMEOVER';
+
+    // Determine title based on win/loss
+    const isWin = reason.includes("ESCAPED") || reason.includes("VICTORY");
+    const titleText = isWin ? "YOU WIN!" : "GAME OVER";
+    const titleColor = isWin ? "#00ffcc" : "#ffd700"; // Cyan for win, Gold for loss
+
     document.getElementById('modal').classList.remove('hidden');
-    document.getElementById('modal-title').innerText = "GAME OVER";
+    const titleElement = document.getElementById('modal-title');
+    titleElement.innerText = titleText;
+    titleElement.style.color = titleColor;
+
     document.getElementById('modal-desc').innerHTML = `<span style="color: #e94560; font-size: 16px;">${reason}</span><br><br>FINAL SCORE: ${score}`;
     document.getElementById('char-select-container').style.display = 'block'; 
 }
