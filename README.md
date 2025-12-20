@@ -90,3 +90,31 @@ Navigate to `src/data/projects.json`. The system automatically generates "Cartri
   "version": "v1.0",
   "size": "128KB"
 }
+```
+
+### 2. Adding React "Cartridges" (Advanced)
+To run a standalone React component (like a built-in game or tool) inside the arcade overlay without the OS UI (Navbar/Footer):
+
+**Step A: Create the Component**
+Place your game file in `src/games/YourGame/Game.jsx`.
+
+**Step B: Register the Route**
+Add the route to `src/App.jsx` under the Standalone Group.
+
+```javascript
+import YourGame from "./games/YourGame/Game";
+
+
+// ... inside <Routes>
+<Route path="/play/your-game" element={<YourGame />} />
+```
+**Step C: Link the Cartridge In src/data/projects.json, point the link to the internal route using the hash prefix.**
+```json
+{
+  "title": "My React Game",
+  "image": "/images/preview.png",
+  "link": "/#/play/your-game", // Note the /#/ prefix
+  "mode": "arcade",
+  "version": "v2.0",
+  "size": "5MB"
+}
